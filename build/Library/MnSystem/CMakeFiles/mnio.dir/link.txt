@@ -1,0 +1,2 @@
+/usr/bin/ar qc libmnio.a CMakeFiles/mnio.dir/IO/IO.cpp.o
+/usr/bin/ranlib libmnio.a

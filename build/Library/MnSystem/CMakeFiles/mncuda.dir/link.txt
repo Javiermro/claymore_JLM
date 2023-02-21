@@ -1,0 +1,2 @@
+/usr/bin/ar qc libmncuda.a CMakeFiles/mncuda.dir/Cuda/Cuda.cu.o CMakeFiles/mncuda.dir/Cuda/DeviceUtils.cu.o CMakeFiles/mncuda.dir/Cuda/MemoryUtils.cu.o
+/usr/bin/ranlib libmncuda.a

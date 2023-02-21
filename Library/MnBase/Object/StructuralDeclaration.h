@@ -4,7 +4,6 @@
 #include <MnBase/Memory/MemObj.h>
 #include <MnBase/Meta/MathMeta.h>
 #include <type_traits>
-#include <iostream>
 
 namespace mn {
 
@@ -112,35 +111,25 @@ struct structural_traits {
 
   // memory manage
   template <typename Allocator> void allocate_handle(Allocator allocator) {
-    if (self::size != 0) {
+    if (self::size != 0)
       _handle.ptr = allocator.allocate(self::size);
-      std::cout << "Allocate_handle structural_traits, size: " << self::size << "\n";
-    }
-    else {
+    else
       _handle.ptr = nullptr;
-      std::cout << "Allocate_handle nullptr structural_traits, size: " << self::size << "\n";
-    }
   }
   template <typename Allocator>
   void allocate_handle(Allocator allocator, std::size_t s) {
-    if (s != 0) {
+    if (s != 0)
       _handle.ptr = allocator.allocate(s);
-      std::cout << "Allocate_handle structural_traits, size: " << s << "\n";
-    }
-    else {
+    else
       _handle.ptr = nullptr;
-      std::cout << "Allocate_handle nullptr structural_traits, size: " << s << "\n";
-    }
   }
   template <typename Allocator> void deallocate(Allocator allocator) {
-    std::cout << "Deallocate structural_traits, size: " << self::size << "\n";
-    if (self::size && _handle.ptr) allocator.deallocate(_handle.ptr, self::size);
+    allocator.deallocate(_handle.ptr, self::size);
     _handle.ptr = nullptr;
   }
   template <typename Allocator>
   void deallocate(Allocator allocator, std::size_t s) {
-    if (s && _handle.ptr) allocator.deallocate(_handle.ptr, s);
-    std::cout << "Deallocated structural_traits, size: " << s << "\n";
+    allocator.deallocate(_handle.ptr, s);
     _handle.ptr = nullptr;
   }
   // value access
@@ -230,30 +219,20 @@ struct structural<structural_type::hash, Decoration, Domain, Layout,
   using value_t = typename Domain::index_type;
   static constexpr auto sentinel_v = value_t(-1);
   // data members
-  value_t _capacity; // Capacity of the table
-  value_t *_cnt; // Number of active keys
-  key_t *_activeKeys; // Active keys in the table
-  value_t *_indexTable; // Lookup table
+  value_t _capacity;
+  value_t *_cnt;
+  key_t *_activeKeys;   //
+  value_t *_indexTable; //
   // func members
   template <typename Allocator>
   void allocate_table(Allocator allocator, value_t capacity) {
     _capacity = capacity;
     _cnt = static_cast<value_t *>(allocator.allocate(sizeof(value_t)));
-    std::cout << "Allocated structural hash _cnt., size in bytes: " << sizeof(value_t) << "\n";
-    _activeKeys = static_cast<key_t *>(allocator.allocate(sizeof(key_t) * capacity));
-    std::cout << "Allocated structural hash _activeKeys, size: " << (sizeof(key_t) * capacity) << "\n";
-    _indexTable = static_cast<value_t *>(allocator.allocate(sizeof(value_t) * Domain::extent));
-    std::cout << "Allocated structural hash _indexTable, size: " << (sizeof(value_t) * Domain::extent) << "\n";
-  }
-  template <typename Allocator>
-  void allocate_table(Allocator allocator, value_t capacity, value_t runtime_extent) {
-    _capacity = capacity;
-    _cnt = static_cast<value_t *>(allocator.allocate(sizeof(value_t)));
-    std::cout << "Allocated structural hash _cnt., size: " << sizeof(value_t) << "\n";
-    _activeKeys = static_cast<key_t *>(allocator.allocate(sizeof(key_t) * capacity));
-    std::cout << "Allocated structural hash _activeKeys, size: " << (sizeof(key_t) * capacity) << "\n";
-    _indexTable = static_cast<value_t *>(allocator.allocate(sizeof(value_t) * runtime_extent));
-    std::cout << "Allocated structural hash _indexTable, runtime size: " << (sizeof(value_t) * runtime_extent) << "\n";
+    _activeKeys =
+        static_cast<key_t *>(allocator.allocate(sizeof(key_t) * capacity));
+    /// lookup table
+    _indexTable = static_cast<value_t *>(
+        allocator.allocate(sizeof(value_t) * Domain::extent));
   }
   template <typename Allocator>
   void resize_table(Allocator allocator, std::size_t capacity) {
@@ -263,27 +242,9 @@ struct structural<structural_type::hash, Decoration, Domain, Layout,
   }
   template <typename Allocator> void deallocate(Allocator allocator) {
     allocator.deallocate(_cnt, sizeof(value_t));
-    std::cout << "Deallocated structural hash _cnt, size:" << sizeof(value_t) << "\n";
     allocator.deallocate(_activeKeys, sizeof(key_t) * _capacity);
-    std::cout << "Deallocated structural hash _activeKeys, size:" << (sizeof(key_t) * _capacity) << "\n";
     allocator.deallocate(_indexTable, sizeof(value_t) * Domain::extent);
-    std::cout << "Deallocated structural hash _indexTable, size: " << ( sizeof(value_t) * Domain::extent) << "\n";
-    base_t::deallocate(allocator); // Maybe unneccesary, unclear
-    std::cout << "Deallocated structural hash base_t." << "\n";
-    _capacity = 0;
-    _cnt = nullptr;
-    _activeKeys = nullptr;
-    _indexTable = nullptr;
-  }
-  template <typename Allocator> void deallocate(Allocator allocator, value_t runtime_extent) {
-    allocator.deallocate(_cnt, sizeof(value_t));
-    std::cout << "Deallocated structural hash _cnt, size:" << sizeof(value_t) << "\n";
-    allocator.deallocate(_activeKeys, sizeof(key_t) * _capacity);
-    std::cout << "Deallocated structural hash _activeKeys, size:" << (sizeof(key_t) * _capacity) << "\n";
-    allocator.deallocate(_indexTable, sizeof(value_t) * runtime_extent);
-    std::cout << "Deallocated structural hash _indexTable, runtimesize: " << ( sizeof(value_t) * runtime_extent) << "\n";
-    base_t::deallocate(allocator); // Maybe unneccesary, unclear
-    std::cout << "Deallocated structural hash base_t." << "\n";
+    base_t::deallocate(allocator);
     _capacity = 0;
     _cnt = nullptr;
     _activeKeys = nullptr;
@@ -349,15 +310,11 @@ struct structural<structural_type::dynamic, Decoration, Domain, Layout,
   template <typename Allocator>
   void allocate_handle(Allocator allocator,
                        std::size_t capacity = Domain::extent) {
-    if (capacity != 0) {
+    if (capacity != 0)
       this->_handle.ptr =
           allocator.allocate(capacity * base_t::element_storage_size);
-      std::cout << "Allocated structural dynamic, size: " << capacity * base_t::element_storage_size << "\n";
-    }
-    else {
+    else
       this->_handle.ptr = nullptr;
-      std::cout << "Allocated nullptr structural dynamic, size: " << capacity * base_t::element_storage_size << "\n";
-    }
     _capacity = capacity;
   }
   template <typename Allocator>
@@ -370,7 +327,6 @@ struct structural<structural_type::dynamic, Decoration, Domain, Layout,
   template <typename Allocator> void deallocate(Allocator allocator) {
     allocator.deallocate(this->_handle.ptr,
                          _capacity * base_t::element_storage_size);
-    std::cout << "Deallocated structural dynamic, size:" << (_capacity * base_t::element_storage_size)  << "\n";
     _capacity = 0;
     this->_handle.ptr = nullptr;
   }

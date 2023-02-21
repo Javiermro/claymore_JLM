@@ -1,0 +1,11 @@
+# Hashes of file build rules.
+77c2491c2e50132f020eee91a81340ce CMakeFiles/rapidjson-populate
+8cd8ae659c3c4b67d8ae07739c57d45a CMakeFiles/rapidjson-populate-complete
+9629d5d8e9f019c1d0368f8a88a0ef12 rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-build
+40ae26a1103d00242a69dabc82b859f1 rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-configure
+ad1a5f015c18808b5f0250e3f8edf13c rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-download
+65fe5019399e739ef0c1174045f48c40 rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-install
+0bb34adfe5f9e01720b159bd998cb096 rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-mkdir
+108b4627dbf76d35e3a10cae5df890b1 rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-patch
+6d34847a31a75136642d8208122cd415 rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-test
+148226dd5e9860f0db1d67bcf142c4d8 rapidjson-populate-prefix/src/rapidjson-populate-stamp/rapidjson-populate-update

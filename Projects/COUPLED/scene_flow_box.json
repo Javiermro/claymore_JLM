@@ -14,7 +14,7 @@
 			"gpu": 0,
 			"type": "particles",
 			"constitutive": "JFluid",
-			"output_attribs": ["ID", "Pressure"],
+			"output_attribs": ["ID", "Velocity_X", "Pressure"],
 			"track_particle_id": [0],
 			"track_attribs": ["Position_X"],
 			"target_attribs": ["Position_Y"],

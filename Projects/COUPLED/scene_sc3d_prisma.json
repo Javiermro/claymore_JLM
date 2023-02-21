@@ -1,5 +1,6 @@
 {
-	"simulation": { 
+	"simulation": {
+		"gpuid": 0,
 		"gravity": -9.81,
 		"fps": 60,
 		"frames": 180,
@@ -24,7 +25,6 @@
 			"rho": 1650,
 			"youngs_modulus": 1e7,
 			"poisson_ratio": 0.3,
-			"SandVolCorrection": true,
 			"friction_angle": 40,
 			"cohesion": 0.0005,
 			"logJp0": 0,
@@ -32,7 +32,7 @@
 			"Sand_volCorrection": true,
 			"use_ASFLIP": true,
 			"use_FEM": false,
-			"use_FBAR": true,
+			"use_FBAR": false,
 			"alpha": 0,
 			"beta_min": 0,
 			"beta_max": 0,
@@ -43,7 +43,7 @@
 					"object": "Box",
 					"operation": "Add",
 					"span": [0.1, 0.4, 0.1],
-					"offset": [1.2, 0.0, 1.2],
+					"offset": [1.2, 0.1, 1.2],
 					"array": [1, 1, 1],
 					"spacing": [0, 0, 0]
 				}

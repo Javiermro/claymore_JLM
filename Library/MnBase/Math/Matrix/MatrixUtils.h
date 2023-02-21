@@ -295,22 +295,6 @@ template <typename T> constexpr void matrixDeviatoric3d(const T *in, T *out) {
 // Engineering function utils (Justin Bonus)
 
 template <typename T>
-constexpr void compute_StrainSmall_from_DefGrad(const T *F, T *e) 
-{
-  // Small strain = 1/2 (Def. Gradient^T + Def. Gradient) - Identity Matrix
-  // Small strain = 1/2 (Grad(Displacement)^T + Grad(Displacement))
-  e[0] = 0.5 * ((F[0]) + (F[0]))-1;
-  e[1] = 0.5 * (F[1] + F[3]);
-  e[2] = 0.5 * (F[2] + F[6]);
-  e[3] = 0.5 * (F[3] + F[1]);
-  e[4] = 0.5 * ((F[4]) + (F[4]))-1;
-  e[5] = 0.5 * (F[5] + F[7]);
-  e[6] = 0.5 * (F[6] + F[2]);
-  e[7] = 0.5 * (F[7] + F[5]);
-  e[8] = 0.5 * ((F[8]) + (F[8]))-1;
-}
-
-template <typename T>
 constexpr void compute_RateOfDeformation_from_VelocityGrad(const T *C, T *d) 
 {
   d[0] = 0.5 * (C[0] + C[0]);
@@ -345,15 +329,6 @@ constexpr T compute_VonMisesStress_from_StressCauchy(const T *x)
                   (x[4]-x[8])*(x[4]-x[8]) + 
                   (x[8]-x[0])*(x[8]-x[0]) + 
                   6*(x[3]*x[3] + x[6]*x[6] + x[7]*x[7]) ) * 0.5);
-}
-
-template <typename T> 
-constexpr T compute_VonMisesStrain_from_StrainSmall(const T *x) 
-{
-  return sqrt( (  (x[0]-x[4])*(x[0]-x[4]) + 
-                  (x[4]-x[8])*(x[4]-x[8]) + 
-                  (x[8]-x[0])*(x[8]-x[0]) + 
-                  4*(x[3]*x[3] + x[6]*x[6] + x[7]*x[7]) ) * 0.5);
 }
 
 template <typename T> 
@@ -413,12 +388,11 @@ constexpr void compute_Principals_from_Invariants_3x3_Sym_Tensor(const T *x, T *
 {
   // A number of assumptions about the tensor required
   // Must be symmetric, maybe positive semi-definite?
-  T p = (3.0*x[1] - x[0]*x[0]) / 9.0;  //< -J2
-  T q = (2*x[0]*x[0]*x[0] - 9*x[0]*x[1] + 27*x[2]) / 54.0; //< -J3
-  T t = acos( q / sqrt(-(p*p*p)) );
+  T p = - ((1.0/3.0)*x[0]*x[0] - x[1]);  //< -J2
+  T q = - ((2.0/27.0)*x[0]*x[0]*x[0] - (1.0/3.0)*x[0]*x[1] + x[2]); //< -J3
   for (int k = 0; k < 3; k++) 
   {
-    out[k] = (x[0] / 3.0) + 2.0 * sqrt(-p) * cos((t/3.0) + (2.0/3.0) * ((T)k) * PI_AS_A_DOUBLE); //< J1
+    out[k] = (x[0] / 3.0) + 2.0 * sqrt(-p / 3.0) * cos((1.0/3.0) * acos((3*q/(2*p)) * sqrt(-3.0/p) ) - (2.0/3.0) * ((T)k - 1.0) * PI_AS_A_DOUBLE); //< J1
   }
 }
 //

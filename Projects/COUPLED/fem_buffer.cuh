@@ -116,7 +116,7 @@ struct ElementBufferImpl : Instance<element_buffer_<element_bin_<ft>>> {
   template <typename Allocator>
   ElementBufferImpl(Allocator allocator)
       : base_t{spawn<element_buffer_<element_bin_<ft>>, orphan_signature>(
-            allocator)} { std:: cout << "Constructing ElementBufferImpl." << std::endl; }
+            allocator)} {}
 
   template <typename Allocator>
   void checkCapacity(Allocator allocator, std::size_t capacity) {
@@ -240,7 +240,6 @@ using element_buffer_t =
 struct VerticeArray : Instance<vertice_array_13_> {
   using base_t = Instance<vertice_array_13_>;
   VerticeArray &operator=(base_t &&instance) {
-    std::cout << "VerticeArray move assignment" << std::endl;
     static_cast<base_t &>(*this) = instance;
     return *this;
   }
@@ -249,7 +248,6 @@ struct VerticeArray : Instance<vertice_array_13_> {
 struct ElementArray : Instance<element_array_> {
   using base_t = Instance<element_array_>;
   ElementArray &operator=(base_t &&instance) {
-    std::cout << "ElementArray move assignment" << std::endl;
     static_cast<base_t &>(*this) = instance;
     return *this;
   }
@@ -257,15 +255,10 @@ struct ElementArray : Instance<element_array_> {
 
 struct ElementAttrib : Instance<element_attrib_> {
   using base_t = Instance<element_attrib_>;
-  // Move assignment operator
   ElementAttrib &operator=(base_t &&instance) {
     static_cast<base_t &>(*this) = instance;
     return *this;
   }
-  // ~ElementAttrib() {
-  //   if (this->val_1d(_0, 0) != nullptr)
-  //     cudeFree(this->val_1d(_0, 0));
-  // }
 };
 
 

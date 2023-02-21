@@ -28,7 +28,7 @@ Multi-GPU related setup:
 
 Additional material setup
 ``````````````````````````
-In *particle_buffer.cuh*, there are currently four types of particles supported. They are named *JFluid*, *FixedCorotated*, *Sand*, *NACC* and *CoupledUP*. 
+In *particle_buffer.cuh*, there are currently four types of particles supported. They are named *JFluid*, *FixedCorotated*, *Sand*, and *NACC*. 
 Within each **ParticleBuffer**, there are various material-dependent constant parameters that could be configured.
 
 Initial model setup

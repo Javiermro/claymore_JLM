@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)    # support relative path
 
 message("===============================================================")
-set(CMAKE_BUILD_TYPE Release)
+set(CMAKE_BUILD_TYPE Release) #Debug
 
 include("project_info.in")
 project(Mn 
