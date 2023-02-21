@@ -4195,6 +4195,8 @@ __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
     src_blockno = blockIdx.x;
   }
 
+  printf("Particle %i incorrect ID!\n", src_blockno);
+
   for (int base = threadIdx.x; base < numViInArena; base += blockDim.x) {
     char local_block_id = base / numViPerBlock;
     auto blockno = partition.query(
