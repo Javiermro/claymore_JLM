@@ -143,6 +143,7 @@ template <> struct particle_bin_<material_e::FixedCorotated_ASFLIP_FBAR> : parti
 template <> struct particle_bin_<material_e::NeoHookean_ASFLIP_FBAR> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::Sand> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::NACC> : particle_bin18_f_ {};
+template <> struct particle_bin_<material_e::CoupledUP> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::Meshed> : particle_bin11_f_ {};
 
 
@@ -893,6 +894,73 @@ struct ParticleBuffer<material_e::NACC> : ParticleBufferImpl<material_e::NACC> {
   ParticleBuffer(Allocator allocator) : base_t{allocator} {}
 };
 
+
+template <>
+struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::CoupledUP> {
+  using base_t = ParticleBufferImpl<material_e::CoupledUP>;
+  PREC length = DOMAIN_LENGTH; // Domain total length [m] (scales volume, etc.)
+  PREC rho = DENSITY;
+  PREC volume = DOMAIN_VOLUME * (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
+                  (1 << DOMAIN_BITS) / MODEL_PPC);
+  PREC mass = (volume * DENSITY);
+  PREC E = YOUNGS_MODULUS;
+  PREC nu = POISSON_RATIO;
+  PREC lambda = YOUNGS_MODULUS * POISSON_RATIO /
+                 ((1 + POISSON_RATIO) * (1 - 2 * POISSON_RATIO));
+  PREC mu = YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO));
+
+  PREC frictionAngle = 45.f;
+  PREC bm = 2.f / 3.f * (YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO))) +
+             (YOUNGS_MODULUS * POISSON_RATIO /
+              ((1 + POISSON_RATIO) *
+               (1 - 2 * POISSON_RATIO))); ///< bulk modulus, kappa
+  PREC xi = 0.8f;                        ///< hardening factor
+  PREC logJp0 = -0.01f;
+  PREC beta = 0.5f;
+  static constexpr PREC mohrColumbFriction =
+      0.503599787772409; //< sqrt((T)2 / (T)3) * (T)2 * sin_phi / ((T)3 -
+                         // sin_phi);
+  static constexpr PREC M =
+      1.850343771924453; ///< mohrColumbFriction * (T)dim / sqrt((T)2 / ((T)6
+                         ///< - dim));
+  static constexpr PREC Msqr = 3.423772074299613;
+  bool hardeningOn = true;
+  bool use_ASFLIP = false; //< Use ASFLIP/PIC mixing? Default off.
+  PREC alpha = 0.0;  //< FLIP/PIC Mixing Factor [0.1] -> [PIC, FLIP]
+  PREC beta_min = 0.0; //< ASFLIP Minimum Position Correction Factor  
+  PREC beta_max = 0.0; //< ASFLIP Maximum Position Correction Factor 
+  PREC FBAR_ratio = 0.0; //< F-Bar Anti-locking mixing ratio (0 = None, 1 = Full)
+  bool use_FEM = false; //< Use Finite Elements? Default off. Must set mesh
+  bool use_FBAR = false; //< Use Simple F-Bar anti-locking? Default off.
+  void updateParameters(PREC l, config::MaterialConfigs mat, 
+                        config::AlgoConfigs algo) {
+    length = l;
+    rho = mat.rho;
+    volume = length*length*length * ( 1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
+                    (1 << DOMAIN_BITS) / mat.ppc);
+    mass = volume * mat.rho;
+    lambda = mat.E * mat.nu / ((1 + mat.nu) * (1 - 2 * mat.nu));
+    mu = mat.E / (2 * (1 + mat.nu));
+    bm =
+        2.f / 3.f * (mat.E / (2 * (1 + mat.nu))) + (mat.E * mat.nu / ((1 + mat.nu) * (1 - 2 * mat.nu)));
+    logJp0 = mat.logJp0;
+    frictionAngle = mat.frictionAngle;
+    beta = mat.beta;
+    xi = mat.xi;
+    hardeningOn = mat.hardeningOn;
+    alpha = algo.ASFLIP_alpha;
+    beta_min = algo.ASFLIP_beta_min;
+    beta_max = algo.ASFLIP_beta_max;
+    FBAR_ratio = algo.FBAR_ratio;
+    use_ASFLIP = algo.use_ASFLIP;
+    use_FEM = algo.use_FEM;
+    use_FBAR = algo.use_FBAR;
+  }
+  template <typename Allocator>
+  ParticleBuffer(Allocator allocator) : base_t{allocator} {}
+};
+
+
 template <>
 struct ParticleBuffer<material_e::Meshed>
     : ParticleBufferImpl<material_e::Meshed> {
@@ -950,6 +1018,7 @@ using particle_buffer_t =
             ParticleBuffer<material_e::NeoHookean_ASFLIP_FBAR>,
             ParticleBuffer<material_e::Sand>, 
             ParticleBuffer<material_e::NACC>,
+            ParticleBuffer<material_e::CoupledUP>,
             ParticleBuffer<material_e::Meshed>>;
 
 using particle_array_ =

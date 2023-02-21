@@ -55,6 +55,7 @@ enum class material_e { JFluid = 0,
                         NeoHookean_ASFLIP_FBAR,
                         Sand, 
                         NACC, 
+                        CoupledUP, 
                         Meshed,
                         Total };
 

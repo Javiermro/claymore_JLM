@@ -1013,6 +1013,21 @@ void parse_scene(std::string fn,
                       output_attribs, track_particle_id, track_attribs, target_attribs);
                 fmt::print(fg(fmt::color::green),"GPU[{}] Particle material[{}] model updated.\n", gpu_id, constitutive);
               } 
+              else if (constitutive == "CoupledUP" || constitutive == "CoupleUP" || constitutive == "UP" || constitutive == "COUPLED" || constitutive == "coupled" || constitutive == "Saturated") {
+                benchmark->initModel<mn::material_e::CoupledUP>(gpu_id, positions, velocity);
+                materialConfigs.E = model["youngs_modulus"].GetDouble(); 
+                materialConfigs.nu = model["poisson_ratio"].GetDouble();
+                materialConfigs.logJp0 = model["logJp0"].GetDouble(); 
+                materialConfigs.frictionAngle = model["friction_angle"].GetDouble();
+                materialConfigs.beta = model["beta"].GetDouble();
+                materialConfigs.xi = model["xi"].GetDouble(); 
+                materialConfigs.hardeningOn = model["hardeningOn"].GetBool(); 
+
+                benchmark->updateParameters<mn::material_e::CoupledUP>( 
+                      gpu_id, materialConfigs, algoConfigs,
+                      output_attribs, track_particle_id, track_attribs, target_attribs);
+                fmt::print(fg(fmt::color::green),"GPU[{}] Particle material[{}] model updated.\n", gpu_id, constitutive);
+              } 
               else 
               {
                 fmt::print(fg(fmt::color::red),"ERROR: GPU[{}] constititive[{}] does not exist! \n",  gpu_id, constitutive);
