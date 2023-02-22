@@ -670,6 +670,30 @@ template<material_e mt>
         });
   }
 
+
+  void updateCoupledUPParameters(int did, config::MaterialConfigs materialConfigs,
+                              config::AlgoConfigs algoConfigs, 
+                              std::vector<std::string> names,
+                              int trackID, std::vector<std::string> trackNames,
+                              std::vector<std::string> targetNames) {
+    match(particleBins[0][did])(
+        [&](auto &pb) {},
+        [&](ParticleBuffer<material_e::CoupledUP> &pb) {
+          pb.updateParameters(length, materialConfigs, algoConfigs);
+          pb.updateOutputs(names);
+          pb.updateTrack(trackNames, trackID);
+          pb.updateTargets(targetNames);
+        });
+    match(particleBins[1][did])(
+        [&](auto &pb) {},
+        [&](ParticleBuffer<material_e::CoupledUP> &pb) {
+          pb.updateParameters(length, materialConfigs, algoConfigs);
+          pb.updateOutputs(names);
+          pb.updateTrack(trackNames, trackID);
+          pb.updateTargets(targetNames);
+        });
+  }
+
   void updateMeshedParameters(int did, config::MaterialConfigs materialConfigs,
                               config::AlgoConfigs algoConfigs, 
                               std::vector<std::string> names) 
