@@ -3,10 +3,10 @@
 		"gpuid": 0,
 		"gravity": -9.81,
 		"fps": 60,
-		"frames": 180,
-		"default_dt": 7.5e-5,
-		"default_dx": 0.025,
-		"domain": [2.50, 0.50, 2.50],
+		"frames": 60,
+		"default_dt": 1.0e-4,
+		"default_dx": 0.1,
+		"domain": [1.0, 0.5, 1.0],
 		"save_path": "./",
 		"save_suffix": ".bgeo"
 	},
@@ -30,26 +30,25 @@
 			"logJp0": 0,
 			"beta": 1,
 			"Sand_volCorrection": true,
-			"use_ASFLIP": true,
+			"use_ASFLIP": false,
 			"use_FEM": false,
-			"use_FBAR": false,
+			"use_FBAR": true,
 			"alpha": 0,
 			"beta_min": 0,
 			"beta_max": 0,
-			"FBAR_ratio": 0.99,
 			"velocity": [0, 0, 0],
 			"geometry": [
 				{
 					"object": "Box",
 					"operation": "Add",
-					"span": [0.1, 0.4, 0.1],
-					"offset": [1.2, 0.1, 1.2],
+					"span": [0.2, 0.4, 0.2],
+					"offset": [0.4, 0.1, 0.4],
 					"array": [1, 1, 1],
 					"spacing": [0, 0, 0]
 				}
 			],
 			"partition_start": [0, 0, 0],
-			"partition_end": [2.50, 0.50, 2.50]
+			"partition_end": [1.0, 0.5, 1.0]
 		}
 	],
 	"grid-boundaries": [
@@ -57,7 +56,7 @@
 			"object": "Wall",
 			"contact": "Separable",
 			"domain_start": [0.0, 0.0, 0.0],
-			"domain_end": [2.50, 0.50, 2.50],
+			"domain_end": [1.0, 0.5, 1.0],
 			"time": [0, 60]
 		}
 	],

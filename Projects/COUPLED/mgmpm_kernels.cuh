@@ -4012,7 +4012,7 @@ __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
   }
 
 
-printf("COUPLED U-P %d \n", blockid);
+//printf("COUPLED U-P %d \n", blockid);
 
   for (int base = threadIdx.x; base < numViInArena; base += blockDim.x) {
     char local_block_id = base / numViPerBlock;

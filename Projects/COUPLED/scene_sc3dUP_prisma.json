@@ -31,7 +31,7 @@
 			"hardeningOn": false,  
 			"use_ASFLIP": true,
 			"use_FEM": false,
-			"use_FBAR": true,
+			"use_FBAR": false,
 			"alpha": 0,
 			"beta_min": 0,
 			"beta_max": 0,
