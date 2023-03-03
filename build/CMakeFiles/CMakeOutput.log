@@ -985,3 +985,94 @@ int main(void)
   return 0;
 }
 
+Performing C++ SOURCE FILE Test has_std_11_flag succeeded with the following output:
+Change Dir: /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c4bee/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c4bee.dir/build.make CMakeFiles/cmTC_c4bee.dir/build
+gmake[1]: Entering directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_c4bee.dir/src.cxx.o
+/usr/bin/c++ -Dhas_std_11_flag  -std=c++11 -o CMakeFiles/cmTC_c4bee.dir/src.cxx.o -c /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_c4bee
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c4bee.dir/link.txt --verbose=1
+/usr/bin/c++ -rdynamic CMakeFiles/cmTC_c4bee.dir/src.cxx.o -o cmTC_c4bee 
+gmake[1]: Leaving directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test has_std_0x_flag succeeded with the following output:
+Change Dir: /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_c0f63/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_c0f63.dir/build.make CMakeFiles/cmTC_c0f63.dir/build
+gmake[1]: Entering directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_c0f63.dir/src.cxx.o
+/usr/bin/c++ -Dhas_std_0x_flag  -std=c++0x -o CMakeFiles/cmTC_c0f63.dir/src.cxx.o -c /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_c0f63
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_c0f63.dir/link.txt --verbose=1
+/usr/bin/c++ -rdynamic CMakeFiles/cmTC_c0f63.dir/src.cxx.o -o cmTC_c0f63 
+gmake[1]: Leaving directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+int main() { return 0; }
+Performing C++ SOURCE FILE Test SUPPORTS_USER_DEFINED_LITERALS succeeded with the following output:
+Change Dir: /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_0a663/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_0a663.dir/build.make CMakeFiles/cmTC_0a663.dir/build
+gmake[1]: Entering directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_0a663.dir/src.cxx.o
+/usr/bin/c++ -DSUPPORTS_USER_DEFINED_LITERALS  -std=c++11 -o CMakeFiles/cmTC_0a663.dir/src.cxx.o -c /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_0a663
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_0a663.dir/link.txt --verbose=1
+/usr/bin/c++  -std=c++11 -rdynamic CMakeFiles/cmTC_0a663.dir/src.cxx.o -o cmTC_0a663 
+gmake[1]: Leaving directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+
+  void operator"" _udl(long double);
+  int main() {}
+Performing C++ SOURCE FILE Test FMT_HAS_VARIANT succeeded with the following output:
+Change Dir: /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_5c096/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_5c096.dir/build.make CMakeFiles/cmTC_5c096.dir/build
+gmake[1]: Entering directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_5c096.dir/src.cxx.o
+/usr/bin/c++ -DFMT_HAS_VARIANT  -std=c++1z -o CMakeFiles/cmTC_5c096.dir/src.cxx.o -c /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp/src.cxx
+Linking CXX executable cmTC_5c096
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_5c096.dir/link.txt --verbose=1
+/usr/bin/c++  -std=c++1z -rdynamic CMakeFiles/cmTC_5c096.dir/src.cxx.o -o cmTC_5c096 
+gmake[1]: Leaving directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+
+
+Source file was:
+
+  #include <variant>
+  int main() {}
+Determining if the strtod_l exist passed with the following output:
+Change Dir: /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp
+
+Run Build Command(s):/usr/bin/gmake -f Makefile cmTC_8e3c9/fast && /usr/bin/gmake  -f CMakeFiles/cmTC_8e3c9.dir/build.make CMakeFiles/cmTC_8e3c9.dir/build
+gmake[1]: Entering directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+Building CXX object CMakeFiles/cmTC_8e3c9.dir/CheckSymbolExists.cxx.o
+/usr/bin/c++   -std=gnu++11 -o CMakeFiles/cmTC_8e3c9.dir/CheckSymbolExists.cxx.o -c /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx
+Linking CXX executable cmTC_8e3c9
+/usr/bin/cmake -E cmake_link_script CMakeFiles/cmTC_8e3c9.dir/link.txt --verbose=1
+/usr/bin/c++ CMakeFiles/cmTC_8e3c9.dir/CheckSymbolExists.cxx.o -o cmTC_8e3c9 
+gmake[1]: Leaving directory '/home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp'
+
+
+File /home/lamec/PROJECTS/claymore_JLM/build/CMakeFiles/CMakeTmp/CheckSymbolExists.cxx:
+/* */
+#include <stdlib.h>
+
+int main(int argc, char** argv)
+{
+  (void)argv;
+#ifndef strtod_l
+  return ((int*)(&strtod_l))[argc];
+#else
+  (void)argc;
+  return 0;
+#endif
+}
