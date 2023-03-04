@@ -154,6 +154,7 @@ template <> struct particle_bin_<material_e::FixedCorotated_ASFLIP_FBAR> : parti
 template <> struct particle_bin_<material_e::NeoHookean_ASFLIP_FBAR> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::Sand> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::NACC> : particle_bin18_f_ {};
+template <> struct particle_bin_<material_e::CoupledUP> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::Meshed> : particle_bin11_f_ {};
 
 
@@ -1820,6 +1821,180 @@ struct ParticleBuffer<material_e::NACC> : ParticleBufferImpl<material_e::NACC> {
 };
 
 
+
+
+template <>
+struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::CoupledUP> {
+  using base_t = ParticleBufferImpl<material_e::CoupledUP>;
+  PREC length = DOMAIN_LENGTH; // Domain total length [m] (scales volume, etc.)
+  PREC rho = DENSITY;
+  PREC volume = DOMAIN_VOLUME * (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
+                  (1 << DOMAIN_BITS) / MODEL_PPC);
+  PREC mass = (volume * DENSITY);
+  PREC E = YOUNGS_MODULUS;
+  PREC nu = POISSON_RATIO;
+  PREC lambda = YOUNGS_MODULUS * POISSON_RATIO /
+                 ((1 + POISSON_RATIO) * (1 - 2 * POISSON_RATIO));
+  PREC mu = YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO));
+
+  PREC frictionAngle = 45.f;
+  PREC bm = 2.f / 3.f * (YOUNGS_MODULUS / (2 * (1 + POISSON_RATIO))) +
+             (YOUNGS_MODULUS * POISSON_RATIO /
+              ((1 + POISSON_RATIO) *
+               (1 - 2 * POISSON_RATIO))); ///< bulk modulus, kappa
+  PREC xi = 0.8f;                        ///< hardening factor
+  PREC logJp0 = -0.01f;
+  PREC beta = 0.5f;
+  static constexpr PREC mohrColumbFriction =
+      0.503599787772409; //< sqrt((T)2 / (T)3) * (T)2 * sin_phi / ((T)3 -
+                         // sin_phi);
+  static constexpr PREC M =
+      1.850343771924453; ///< mohrColumbFriction * (T)dim / sqrt((T)2 / ((T)6
+                         ///< - dim));
+  static constexpr PREC Msqr = 3.423772074299613;
+  bool hardeningOn = true;
+  bool use_ASFLIP = false; //< Use ASFLIP/PIC mixing? Default off.
+  PREC alpha = 0.0;  //< FLIP/PIC Mixing Factor [0.1] -> [PIC, FLIP]
+  PREC beta_min = 0.0; //< ASFLIP Minimum Position Correction Factor  
+  PREC beta_max = 0.0; //< ASFLIP Maximum Position Correction Factor 
+  PREC FBAR_ratio = 0.0; //< F-Bar Anti-locking mixing ratio (0 = None, 1 = Full)
+  bool use_FEM = false; //< Use Finite Elements? Default off. Must set mesh
+  bool use_FBAR = false; //< Use Simple F-Bar anti-locking? Default off.
+  void updateParameters(PREC l, config::MaterialConfigs mat, 
+                        config::AlgoConfigs algo) {
+    length = l;
+    rho = mat.rho;
+    volume = length*length*length * ( 1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
+                    (1 << DOMAIN_BITS) / mat.ppc);
+    mass = volume * mat.rho;
+    lambda = mat.E * mat.nu / ((1 + mat.nu) * (1 - 2 * mat.nu));
+    mu = mat.E / (2 * (1 + mat.nu));
+    bm =
+        2.f / 3.f * (mat.E / (2 * (1 + mat.nu))) + (mat.E * mat.nu / ((1 + mat.nu) * (1 - 2 * mat.nu)));
+    logJp0 = mat.logJp0;
+    frictionAngle = mat.frictionAngle;
+    beta = mat.beta;
+    xi = mat.xi;
+    hardeningOn = mat.hardeningOn;
+    alpha = algo.ASFLIP_alpha;
+    beta_min = algo.ASFLIP_beta_min;
+    beta_max = algo.ASFLIP_beta_max;
+    FBAR_ratio = algo.FBAR_ratio;
+    use_ASFLIP = algo.use_ASFLIP;
+    use_FEM = algo.use_FEM;
+    use_FBAR = algo.use_FBAR;
+  }
+
+  // * Attributes saved on particles of this material. Given variable names for easy mapping
+  // * REQUIRED : Variable order matches atttribute order in ParticleBuffer.val_1d(VARIABLE, ...)
+  // * e.g. if ParticleBuffer<MATERIAL>.val_1d(4_, ...) is Velocity_X, then set Velocity_X = 4
+  // * REQUIRED : Define material's unused base variables after END to avoid errors.
+  // TODO : Write unit-test to guarantee all attribs_e have base set of variables.
+  enum attribs_e : int {
+          EMPTY=-3, // Empty attribute request 
+          INVALID_CT=-2, // Invalid compile-time request, e.g. asking for variable after END
+          INVALID_RT=-1, // Invalid run-time request e.g. "Speed_X" instead of "Velocity_X"
+          START=0, // Values less than or equal to START not held on particle
+          Position_X=0, Position_Y=1, Position_Z=2,
+          DefGrad_XX, DefGrad_XY, DefGrad_XZ,
+          DefGrad_YX, DefGrad_YY, DefGrad_YZ,
+          DefGrad_ZX, DefGrad_ZY, DefGrad_ZZ,
+          logJp,
+          Velocity_X, Velocity_Y, Velocity_Z,
+          JBar, DefGrad_Determinant_FBAR=JBar, 
+          ID,
+          END, // Values greater than or equal to END not held on particle
+          // REQUIRED: Put N/A variables for specific material below END
+          J, DefGrad_Determinant=J, 
+          Volume_FBAR 
+  };
+
+  // TODO : Change if/else statement to case/switch. may require compile-time min-max guarantee
+  template <attribs_e ATTRIBUTE, typename T>
+   __device__ PREC
+  getAttribute(const T bin, const T particle_id_in_bin){
+    if (ATTRIBUTE < attribs_e::START) return (PREC)ATTRIBUTE;
+    else if (ATTRIBUTE >= attribs_e::END) return (PREC)attribs_e::INVALID_CT;
+    else return this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, std::min(abs(ATTRIBUTE), attribs_e::END-1)>{}, particle_id_in_bin);
+  }
+
+  template <typename T = PREC>
+   __device__ void
+  getVelocity(const T bin, const T particle_id_in_bin, PREC * velocity) {
+    velocity = {
+      this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::Velocity_X>{}, particle_id_in_bin),
+      this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::Velocity_Y>{}, particle_id_in_bin),
+      this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::Velocity_Z>{}, particle_id_in_bin)
+    };
+  }
+
+  template <typename T>
+   __device__ constexpr void
+  getDefGrad(T bin, T particle_id_in_bin, PREC * DefGrad) {
+    DefGrad[0] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_XX>{}, particle_id_in_bin);
+    DefGrad[1] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_XY>{}, particle_id_in_bin);
+    DefGrad[2] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_XZ>{}, particle_id_in_bin);
+    DefGrad[3] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_YX>{}, particle_id_in_bin);
+    DefGrad[4] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_YY>{}, particle_id_in_bin);
+    DefGrad[5] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_YZ>{}, particle_id_in_bin);
+    DefGrad[6] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_ZX>{}, particle_id_in_bin);
+    DefGrad[7] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_ZY>{}, particle_id_in_bin);
+    DefGrad[8] = this->ch(std::integral_constant<unsigned, 0>{}, bin).val_1d(std::integral_constant<unsigned, attribs_e::DefGrad_ZZ>{}, particle_id_in_bin);
+  }
+
+  // TODO: Change logp0 to use particle held value, not initial
+  template <typename T = PREC>
+   __device__ constexpr void
+  getStress_Cauchy(vec<T,9>& F, vec<T,9>& PF){
+    PREC lj = logJp0;
+    compute_stress_CoupledUP(volume, mu, lambda, bm, xi, beta, Msqr, hardeningOn, lj, F, PF);
+  }
+  template <typename T = PREC>
+   __device__ constexpr void
+  getStress_Cauchy(T vol, vec<T,9>& F, vec<T,9>& PF){
+    PREC lj = logJp0;
+    compute_stress_CoupledUP(vol, mu, lambda, bm, xi, beta, Msqr, hardeningOn, lj, F, PF);
+  }
+  
+  template <typename T = PREC>
+   __device__ void
+  getStress_PK1(vec<T,9>& F, vec<T,9>& P){
+    PREC lj = logJp0;
+    compute_stress_PK1_CoupledUP(volume, mu, lambda, bm, xi, beta, Msqr, hardeningOn, lj, F, P);
+  }
+  template <typename T = PREC>
+   __device__ void
+  getStress_PK1(T vol, vec<T,9>& F, vec<T,9>& P){
+    PREC lj = logJp0;
+    compute_stress_PK1_CoupledUP(vol, mu, lambda, bm, xi, beta, Msqr, hardeningOn, lj, F, P);
+  }
+
+  template <typename T = PREC>
+   __device__ void
+  getEnergy_Strain(const vec<T,9>& F, T& strain_energy, T vol){
+    strain_energy = 0.;
+  }
+  template <typename T = PREC>
+   __device__ void
+  getEnergy_Strain(const vec<T,9>& F, T& strain_energy){
+    strain_energy = 0.;
+  }
+  template <typename T = PREC>
+   __device__ void
+  getEnergy_Kinetic(const vec<T,3>& velocity, T& kinetic_energy){  
+    kinetic_energy = 0.5 * mass * __fma_rn(velocity[0], velocity[0], __fma_rn(velocity[1], velocity[1], (velocity[2], velocity[2])));
+    }
+
+  template <typename Allocator>
+  ParticleBuffer(Allocator allocator) : base_t{allocator} {}
+
+  template <typename Allocator>
+  ParticleBuffer(Allocator allocator, std::size_t count)
+      : base_t{allocator, count} {}
+};
+
+
+
 template <>
 struct ParticleBuffer<material_e::Meshed>
     : ParticleBufferImpl<material_e::Meshed> {
@@ -1940,6 +2115,7 @@ using particle_buffer_t =
             ParticleBuffer<material_e::NeoHookean_ASFLIP_FBAR>,
             ParticleBuffer<material_e::Sand>, 
             ParticleBuffer<material_e::NACC>,
+            ParticleBuffer<material_e::CoupledUP>,
             ParticleBuffer<material_e::Meshed>>;
 
 using particle_array_ =
