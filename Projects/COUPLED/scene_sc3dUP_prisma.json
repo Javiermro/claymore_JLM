@@ -1,17 +1,17 @@
 {
-	"simulation": {
-		"gpuid": 0,
+	"simulation": { 
 		"gravity": -9.81,
 		"fps": 60,
 		"frames": 180,
-		"default_dt": 7.5e-5,
-		"default_dx": 0.025,
+		"default_dt": 1e-6,
+		"default_dx": 0.05,
 		"domain": [2.50, 0.50, 2.50],
 		"save_path": "./",
 		"save_suffix": ".bgeo"
 	},
 	"models": [
 		{
+			"model": 0,
 			"gpu": 0,
 			"type": "particles", 
 			"color": "yellow",
@@ -25,13 +25,16 @@
 			"rho": 1650,
 			"youngs_modulus": 1e7,
 			"poisson_ratio": 0.3,
+			"friction_angle": 40,
+			"cohesion": 0.0005,
+			"xi": 0.8,
+			"hardeningOn": true,
 			"logJp0": 0,
-			"friction_angle": 30,
 			"beta": 1,
-			"hardeningOn": false,  
+			"SandVolCorrection": true,
 			"use_ASFLIP": true,
 			"use_FEM": false,
-			"use_FBAR": false,
+			"use_FBAR": true,
 			"alpha": 0,
 			"beta_min": 0,
 			"beta_max": 0,
@@ -42,7 +45,7 @@
 					"object": "Box",
 					"operation": "Add",
 					"span": [0.1, 0.4, 0.1],
-					"offset": [1.2, 0.1, 1.2],
+					"offset": [1.2, 0.0, 1.2],
 					"array": [1, 1, 1],
 					"spacing": [0, 0, 0]
 				}
@@ -67,7 +70,7 @@
 			"direction": "X+",
 			"output_frequency": 120,
 			"domain_start": [0, 0, 0],
-			"domain_end": [0, 0, 0]
+			"domain_end": [2.50, 0.50, 2.50]
 		}
 	],
 	"particle-targets": [
@@ -76,7 +79,7 @@
 			"operation": "Max",
 			"output_frequency": 120,
 			"domain_start": [0, 0, 0],
-			"domain_end":   [0, 0, 0]
+			"domain_end":  [2.50, 0.50, 2.50]
 		}
 	]
 }
