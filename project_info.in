@@ -1,2 +1,0 @@
-set(project_version 0.0.0)
-set(project_description "gpu-based mpm simulator")
