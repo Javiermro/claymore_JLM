@@ -1062,12 +1062,13 @@ void parse_scene(std::string fn,
           
 
           l = sim_default_dx * mn::config::g_dx_inv_d; 
-          if (domain[0] > (l-16*sim_default_dx) || domain[1] > (l-16*sim_default_dx) || domain[2] > (l-16*sim_default_dx)) {
-            fmt::print(fg(red), "ERROR: Simulation domain[{},{},{}] exceeds max domain length[{}]\n", domain[0], domain[1], domain[2], (l-16*sim_default_dx));
+          if (domain[0] > (l-mn::config::g_bc*mn::config::g_blocksize*sim_default_dx) || domain[1] > (l-mn::config::g_bc*mn::config::g_blocksize*sim_default_dx) || domain[2] > (l-mn::config::g_bc*mn::config::g_blocksize*sim_default_dx)) {
+            fmt::print(fg(red), "ERROR: Simulation domain[{},{},{}] exceeds max domain length[{}]\n", domain[0], domain[1], domain[2], (l-mn::config::g_bc*mn::config::g_blocksize*sim_default_dx));
             fmt::print(fg(yellow), "TIP: Shrink domain, grow default_dx, and/or increase DOMAIN_BITS (settings.h) and recompile. Press Enter to continue...\n" ); getchar();
           } 
           uint64_t domainBlockCnt = static_cast<uint64_t>(std::ceil(domain[0] / l * (mn::config::g_grid_size_x))) * static_cast<uint64_t>(std::ceil(domain[1] / domain[1] * (mn::config::g_grid_size_y))) * static_cast<uint64_t>(std::ceil(domain[2] / domain[2] * (mn::config::g_grid_size_z)));
           double reduction = 100. * ( 1. - domainBlockCnt / (mn::config::g_grid_size_x * mn::config::g_grid_size_y * mn::config::g_grid_size_z));
+          domainBlockCnt = (mn::config::g_grid_size_x * mn::config::g_grid_size_y * mn::config::g_grid_size_z); // Force full domain, fix later
           fmt::print(fg(yellow),"Partitions _indexTable data-structure: Saved [{}] percent memory of preallocated partition _indexTable by reudcing domainBlockCnt from [{}] to run-time of [{}] using domain input relative to DOMAIN_BITS and default_dx.\n", reduction, mn::config::g_grid_size_x * mn::config::g_grid_size_y * mn::config::g_grid_size_z, domainBlockCnt);
           fmt::print(fg(cyan),
               "Scene simulation parameters: Domain Length [{}], domainBlockCnt [{}], default_dx[{}], default_dt[{}], fps[{}], frames[{}], gravity[{}], save_suffix[{}]\n",
@@ -1361,23 +1362,6 @@ void parse_scene(std::string fn,
                 {
                   benchmark->initModel<mn::material_e::NACC>(gpu_id, model_id, positions, velocity);
                   benchmark->updateParameters<mn::material_e::NACC>( 
-                        gpu_id, model_id, materialConfigs, algoConfigs,
-                        output_attribs, track_particle_id[0], track_attribs, target_attribs);
-                }
-                else { algo_error = true; }
-              } 
-              else if (constitutive == "CoupledUP" || constitutive == "coupled" || constitutive == "UP" || constitutive == "coupledup") {
-                materialConfigs.E = CheckDouble(model, "youngs_modulus", 1e7); 
-                materialConfigs.nu = CheckDouble(model, "poisson_ratio", 0.2);
-                materialConfigs.logJp0 = CheckDouble(model, "logJp0", 0.0);
-                materialConfigs.xi = CheckDouble(model, "xi", 0.8);
-                materialConfigs.frictionAngle = CheckDouble(model, "friction_angle", 30.0);
-                materialConfigs.beta = CheckDouble(model, "beta", 0.5);
-                materialConfigs.hardeningOn = CheckBool(model, "hardeningOn", true); 
-                if (algoConfigs.use_ASFLIP && algoConfigs.use_FBAR && !algoConfigs.use_FEM)
-                {
-                  benchmark->initModel<mn::material_e::CoupledUP>(gpu_id, model_id, positions, velocity);
-                  benchmark->updateParameters<mn::material_e::CoupledUP>( 
                         gpu_id, model_id, materialConfigs, algoConfigs,
                         output_attribs, track_particle_id[0], track_attribs, target_attribs);
                 }
