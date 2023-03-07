@@ -1358,6 +1358,14 @@ void parse_scene(std::string fn,
                 materialConfigs.cohesion = CheckDouble(model, "cohesion", 0.0);
                 materialConfigs.beta = CheckDouble(model, "beta", 0.5);
                 materialConfigs.volumeCorrection = CheckBool(model, "SandVolCorrection", true); 
+
+                materialConfigs.rhow = CheckDouble(model, "rhow", 1e3);
+                materialConfigs.alpha1 = CheckDouble(model, "alpha1", 1.0);
+                materialConfigs.poro = CheckDouble(model, "poro", 0.9);
+                materialConfigs.Kf = CheckDouble(model, "Kf", 1.0e7);
+                materialConfigs.Ks = CheckDouble(model, "Ks", 2.2e7);
+                materialConfigs.Kperm = CheckDouble(model, "Kperm", 1.0e-5);
+
                 if (algoConfigs.use_ASFLIP && algoConfigs.use_FBAR && !algoConfigs.use_FEM)
                 {
                   benchmark->initModel<mn::material_e::CoupledUP>(gpu_id, model_id, positions, velocity); 

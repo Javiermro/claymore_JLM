@@ -229,8 +229,9 @@ struct MaterialConfigs {
   bool volumeCorrection;
   PREC xi;
   bool hardeningOn;
-  MaterialConfigs() : ppc(8.0), rho(1e3), bulk(2.2e7), visco(1e-3), gamma(7.1), E{1e7}, nu{0.3}, logJp0(0.), frictionAngle(30.), cohesion(0.), beta(0.5), volumeCorrection(false), xi(1.0), hardeningOn(true) {}
-  MaterialConfigs(PREC p, PREC density, PREC k, PREC v, PREC g, PREC e, PREC pr, PREC j, PREC fa, PREC c, PREC b, bool volCorrection, PREC x, bool hard) : ppc(p), rho(density), bulk(k), visco(v), gamma(g), E(e), nu(pr), logJp0(j), frictionAngle(fa), cohesion(c), beta(b), volumeCorrection(false), xi(x), hardeningOn(hard)  {}
+  PREC rhow, alpha1, poro, Kf, Ks, Kperm;
+  MaterialConfigs() : ppc(8.0), rho(1e3), bulk(2.2e7), visco(1e-3), gamma(7.1), E{1e7}, nu{0.3}, logJp0(0.), frictionAngle(30.), cohesion(0.), beta(0.5), volumeCorrection(false), xi(1.0), hardeningOn(true), rhow(1e3), alpha1(1.0), poro(0.9), Kf(1.0e7), Ks(2.2e7), Kperm(1.0e-5) {}
+  MaterialConfigs(PREC p, PREC density, PREC k, PREC v, PREC g, PREC e, PREC pr, PREC j, PREC fa, PREC c, PREC b, bool volCorrection, PREC x, bool hard, PREC densityw, PREC a1, PREC por, PREC Kflu, PREC Ksol, PREC perm) : ppc(p), rho(density), bulk(k), visco(v), gamma(g), E(e), nu(pr), logJp0(j), frictionAngle(fa), cohesion(c), beta(b), volumeCorrection(false), xi(x), hardeningOn(hard), rhow(densityw), alpha1(a1), poro(por), Kf(Kflu), Ks(Ksol), Kperm(perm) {}
   ~MaterialConfigs() {}
 };
 
