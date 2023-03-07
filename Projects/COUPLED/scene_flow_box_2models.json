@@ -32,7 +32,9 @@
 			"beta_min": 0,
 			"beta_max": 0,
 			"FBAR_ratio": 0.9,
-			"velocity": [1, 0, 0],
+			"velocity": [0, 0, 0],
+			"partition_start": [0, 0, 0],
+			"partition_end": [10, 5, 3],			
 			"geometry": [
 				{
 					"object": "Box",
@@ -41,7 +43,8 @@
 					"offset": [0, 1, 0],
 					"array": [1, 1, 1],
 					"spacing": [0, 0, 0],
-					"rotate": [0,0,0]
+					"rotate": [0, 0, 0],
+					"fulcrum": [0, 0, 0]
 				}
 			]
 		},
@@ -61,14 +64,19 @@
 			"poisson_ratio": 0.2,
 			"cohesion": 0.001,
 			"friction_angle": 30,
+			"logJp0" : 0.0,
+			"SandVolCorrection": true,
 			"use_ASFLIP": true,
 			"use_FEM": false,
 			"use_FBAR": true,
 			"alpha": 0,
+			"beta": 0.5,
 			"beta_min": 0,
 			"beta_max": 0,
 			"FBAR_ratio": 0.5,
 			"velocity": [0, 0, 0],
+			"partition_start": [0, 0, 0],
+			"partition_end": [10, 5, 3],	
 			"geometry": [
 				{
 					"object": "Box",
