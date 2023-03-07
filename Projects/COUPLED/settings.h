@@ -48,6 +48,7 @@ enum class material_e { JFluid, JFluid_ASFLIP, JFluid_FBAR, JBarFluid,
                         FixedCorotated, FixedCorotated_ASFLIP, FixedCorotated_ASFLIP_FBAR,
                         NeoHookean_ASFLIP_FBAR,
                         Sand, 
+                        CoupledUP, 
                         NACC, 
                         Meshed,
                         Total };
