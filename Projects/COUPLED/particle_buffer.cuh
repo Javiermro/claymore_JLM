@@ -1748,7 +1748,7 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
     
     rhow = mat.rhow;
     alpha1 = mat.alpha1;
-    poro = mat.poro
+    poro = mat.poro;
     Kf = mat.Kf;
     Ks = mat.Ks;
     Kperm = mat.Kperm;
