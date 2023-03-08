@@ -4189,7 +4189,7 @@ __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
 
       compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda,
                           pbuffer.cohesion, pbuffer.beta, pbuffer.yieldSurface,
-                          pbuffer.volumeCorrection, logJp, F, contrib);
+                          pbuffer.volumeCorrection, logJp, pw, F, contrib);
       {
         auto particle_bin = g_buckets_on_particle_buffer 
             ? next_pbuffer.ch(_0, next_pbuffer._binsts[src_blockno] + pidib / g_bin_capacity) 
