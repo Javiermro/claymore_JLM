@@ -4187,6 +4187,9 @@ __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
       pos += dt * (vel + beta * pbuffer.alpha * (vel_p - vel_FLIP)); //< pos update
       vel += pbuffer.alpha * (vel_p - vel_FLIP); //< vel update
 
+      PREC pw;
+      pw = 0.0;
+
       compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda,
                           pbuffer.cohesion, pbuffer.beta, pbuffer.yieldSurface,
                           pbuffer.volumeCorrection, logJp, pw, F, contrib);
