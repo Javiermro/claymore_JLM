@@ -1821,13 +1821,13 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
 
   template <typename T = PREC>
    __device__ void
-  getStress_Cauchy(vec<T,9>& F, vec<T,9>& PF){
+  getStress_Cauchy(T pw, vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
     compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
   template <typename T = PREC>
    __device__ void
-  getStress_Cauchy(T vol, vec<T,9>& F, vec<T,9>& PF){
+  getStress_Cauchy(T vol, T pw, vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
     compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
