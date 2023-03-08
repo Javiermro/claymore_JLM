@@ -55,6 +55,7 @@ enum class particle_output_attribs_e : int {
         Dilation = StrainSmall_Invariant1, StrainSmall_Determinant = StrainSmall_Invariant3,
         StrainSmall_1,  StrainSmall_2, StrainSmall_3,
         VonMisesStrain,
+        PorePressure,
         logJp=100,
         END,
         ExampleDeprecatedVariable //< Will give INVALID_CT output of -2
@@ -142,6 +143,16 @@ using particle_bin18_f_ =
                f_, f_, f_,
                f_, f_,
                f_>; ///< pos, F, vel, vol_Bar, J_Bar, ID
+using particle_bin19_f_ =
+    structural<structural_type::dense,
+               decorator<structural_allocation_policy::full_allocation,
+                         structural_padding_policy::sum_pow2_align>,
+               ParticleBinDomain, attrib_layout::soa, f_, f_, f_, 
+               f_, f_, f_, f_, f_, f_, f_, f_, f_, 
+               f_, f_, f_,
+               f_, f_,
+               f_,
+               f_>; ///< pos, F, vel, vol_Bar, J_Bar, pw, ID,
 
 template <material_e mt> struct particle_bin_;
 template <> struct particle_bin_<material_e::JFluid> : particle_bin4_f_ {};
@@ -153,7 +164,7 @@ template <> struct particle_bin_<material_e::FixedCorotated_ASFLIP> : particle_b
 template <> struct particle_bin_<material_e::FixedCorotated_ASFLIP_FBAR> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::NeoHookean_ASFLIP_FBAR> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::Sand> : particle_bin18_f_ {};
-template <> struct particle_bin_<material_e::CoupledUP> : particle_bin18_f_ {};
+template <> struct particle_bin_<material_e::CoupledUP> : particle_bin19_f_ {};
 template <> struct particle_bin_<material_e::NACC> : particle_bin18_f_ {};
 template <> struct particle_bin_<material_e::Meshed> : particle_bin11_f_ {};
 
@@ -274,6 +285,8 @@ struct ParticleBufferImpl : Instance<particle_buffer_<particle_bin_<mt>>> {
         else if (n == "VonMisesStrain")  return out_:: VonMisesStrain;
         else if (n == "Dilation")  return out_:: Dilation;
         else if (n == "logJp") return out_:: logJp;
+        else if (n == "PorePressure") return out_:: PorePressure;
+
         else return out_:: INVALID_RT;
   }
 
@@ -466,7 +479,7 @@ struct ParticleBuffer<material_e::JFluid>
           Velocity_X, Velocity_Y, Velocity_Z,
           Volume_FBAR, 
           JBar, DefGrad_Determinant_FBAR=JBar, 
-          ID,
+          ID,          PorePressure,
           logJp
   };
 
@@ -590,7 +603,7 @@ struct ParticleBuffer<material_e::JFluid_ASFLIP>
           DefGrad_ZX, DefGrad_ZY, DefGrad_ZZ,
           Volume_FBAR, 
           JBar, DefGrad_Determinant_FBAR=JBar, 
-          ID,
+          ID,          PorePressure,
           logJp
   };
 
@@ -717,7 +730,7 @@ struct ParticleBuffer<material_e::JFluid_FBAR>
           DefGrad_YX, DefGrad_YY, DefGrad_YZ,
           DefGrad_ZX, DefGrad_ZY, DefGrad_ZZ,
           Velocity_X, Velocity_Y, Velocity_Z,
-          Volume_FBAR, 
+          Volume_FBAR,           PorePressure,
           logJp
   };
 
@@ -844,7 +857,7 @@ struct ParticleBuffer<material_e::JBarFluid>
           DefGrad_XX, DefGrad_XY, DefGrad_XZ,
           DefGrad_YX, DefGrad_YY, DefGrad_YZ,
           DefGrad_ZX, DefGrad_ZY, DefGrad_ZZ,
-          Volume_FBAR, 
+          Volume_FBAR,           PorePressure,
           logJp
   };
 
@@ -1005,7 +1018,7 @@ struct ParticleBuffer<material_e::FixedCorotated>
           // REQUIRED: Put N/A variables for specific material below END
           J, DefGrad_Determinant=J, 
           Velocity_X, Velocity_Y, Velocity_Z,
-          Volume_FBAR, JBar, DefGrad_Determinant_FBAR=JBar, 
+          Volume_FBAR, JBar, DefGrad_Determinant_FBAR=JBar,           PorePressure,
           logJp
   };
 
@@ -1142,7 +1155,7 @@ struct ParticleBuffer<material_e::FixedCorotated_ASFLIP>
           ID,
           END, // Values greater than or equal to END not held on particle
           // REQUIRED: Put N/A variables for specific material below END
-          J, DefGrad_Determinant=J, Volume_FBAR, JBar, DefGrad_Determinant_FBAR=JBar, logJp
+          J, DefGrad_Determinant=J, Volume_FBAR, JBar,           PorePressure,DefGrad_Determinant_FBAR=JBar, logJp
   };
 
 
@@ -1283,7 +1296,7 @@ struct ParticleBuffer<material_e::FixedCorotated_ASFLIP_FBAR>
           Volume_FBAR, JBar, DefGrad_Determinant_FBAR=JBar, ID,
           END, // Values greater than or equal to END not held on particle
           // REQUIRED: Put N/A variables for specific material below END
-          J, DefGrad_Determinant=J, logJp
+          J, DefGrad_Determinant=J,           PorePressure,logJp
   };
 
 
@@ -1424,7 +1437,7 @@ struct ParticleBuffer<material_e::NeoHookean_ASFLIP_FBAR>
           Volume_FBAR, JBar, DefGrad_Determinant_FBAR=JBar, ID,
           END, // Values greater than or equal to END not held on particle
           // REQUIRED: Put N/A variables for specific material below END
-          J, DefGrad_Determinant=J, logJp
+          J, DefGrad_Determinant=J,           PorePressure,logJp
   };
 
 
@@ -1585,6 +1598,7 @@ struct ParticleBuffer<material_e::Sand> : ParticleBufferImpl<material_e::Sand> {
           END, // Values greater than or equal to END not held on particle
           // REQUIRED: Put N/A variables for specific material below END
           J, DefGrad_Determinant=J, 
+                    PorePressure,
           Volume_FBAR 
   };
 
@@ -1700,6 +1714,14 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
   PREC yieldSurface =
       0.816496580927726f * 2.f * 0.5f / (3.f - 0.5f);
   bool volumeCorrection = true;
+
+  PREC rhow = 1.0e3; // water density
+  PREC alpha1 = 1.0; // Biot coef.
+  PREC poro = 0.9; // porosity
+  PREC Kf = 1.0e7; // Water compresibility
+  PREC Ks = 2.2e7; // Soil grain compresibility
+  PREC Kperm = 1.0e-5; // Isothropic permeabily
+
   bool use_ASFLIP = false; //< Use ASFLIP/PIC mixing? Default off.
   PREC alpha = 0.0;  //< FLIP/PIC Mixing Factor [0.1] -> [PIC, FLIP]
   PREC beta_min = 0.0; //< ASFLIP Minimum Position Correction Factor  
@@ -1723,6 +1745,14 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
     beta = mat.beta;
     volumeCorrection = mat.volumeCorrection;
     alpha = algo.ASFLIP_alpha;
+    
+    rhow = mat.rhow;
+    alpha1 = mat.alpha1;
+    poro = mat.poro
+    Kf = mat.Kf;
+    Ks = mat.Ks;
+    Kperm = mat.Kperm;
+
     beta_min = algo.ASFLIP_beta_min;
     beta_max = algo.ASFLIP_beta_max;
     FBAR_ratio = algo.FBAR_ratio;
@@ -1748,6 +1778,7 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
           logJp,
           Velocity_X, Velocity_Y, Velocity_Z,
           JBar, DefGrad_Determinant_FBAR=JBar, 
+          PorePressure,
           ID,
           END, // Values greater than or equal to END not held on particle
           // REQUIRED: Put N/A variables for specific material below END
@@ -1792,13 +1823,13 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
    __device__ void
   getStress_Cauchy(vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
-    compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
+    compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
   template <typename T = PREC>
    __device__ void
   getStress_Cauchy(T vol, vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
-    compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
+    compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
   
   template <typename T = PREC>
@@ -1921,7 +1952,7 @@ struct ParticleBuffer<material_e::NACC> : ParticleBufferImpl<material_e::NACC> {
           ID,
           END, // Values greater than or equal to END not held on particle
           // REQUIRED: Put N/A variables for specific material below END
-          J, DefGrad_Determinant=J, 
+          J, DefGrad_Determinant=J,           PorePressure,
           Volume_FBAR 
   };
 
@@ -2067,7 +2098,7 @@ struct ParticleBuffer<material_e::Meshed>
           DefGrad_XX, DefGrad_XY, DefGrad_XZ,
           DefGrad_YX, DefGrad_YY, DefGrad_YZ,
           DefGrad_ZX, DefGrad_ZY, DefGrad_ZZ,
-          Volume_FBAR, 
+          Volume_FBAR,           PorePressure,
           logJp
   };
 

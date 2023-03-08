@@ -9604,6 +9604,8 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       pvec3 vel_p; //< Particle vel. at n
       PREC sJBar;
       PREC ID;
+      PREC pw;
+      pw = 0.0;
       auto source_particle_bin = pbuffer.ch(_0, source_blockno);
       contrib[0] = source_particle_bin.val(_3, source_pidib % g_bin_capacity);
       contrib[1] = source_particle_bin.val(_4, source_pidib % g_bin_capacity);
@@ -9619,7 +9621,8 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       vel_p[1] = source_particle_bin.val(_14, source_pidib % g_bin_capacity); //< vy
       vel_p[2] = source_particle_bin.val(_15, source_pidib % g_bin_capacity); //< vz
       sJBar = source_particle_bin.val(_16, source_pidib % g_bin_capacity); //< JBar tn
-      ID =  source_particle_bin.val(_17, source_pidib % g_bin_capacity);
+      pw =  source_particle_bin.val(_17, source_pidib % g_bin_capacity); // water pore pressure
+      ID =  source_particle_bin.val(_18, source_pidib % g_bin_capacity);
 
       matrixMatrixMultiplication3d(dws.data(), contrib.data(), F.data());
       
@@ -9643,7 +9646,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
 #pragma unroll 9
       for (int d = 0; d < 9; d++) F[d] = F[d] * ((1.0 - FBAR_ratio) * 1.0 + (FBAR_ratio) * J_Scale);
       compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda, pbuffer.cohesion,
-      pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, F, contrib);
+      pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, pw, F, contrib);
       {
         auto particle_bin = g_buckets_on_particle_buffer 
             ? next_pbuffer.ch(_0, next_pbuffer._binsts[src_blockno] + pidib / g_bin_capacity) 
@@ -9665,7 +9668,8 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
         particle_bin.val(_14, pidib % g_bin_capacity) = vel[1];
         particle_bin.val(_15, pidib % g_bin_capacity) = vel[2];
         particle_bin.val(_16, pidib % g_bin_capacity) = sJBar_new;
-        particle_bin.val(_17, pidib % g_bin_capacity) = ID;
+        particle_bin.val(_18, pidib % g_bin_capacity) = ID;
+        particle_bin.val(_17, pidib % g_bin_capacity) = pw;
       }
 
       {
