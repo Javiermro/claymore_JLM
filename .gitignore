@@ -3,4 +3,5 @@ syntax: glob
 *.csv
 *.tgz
 build/
+Projects/COUPLED/.vscode/
 build/*~

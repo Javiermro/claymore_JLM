@@ -1692,7 +1692,7 @@ template <>
 struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::CoupledUP> {
   using base_t = ParticleBufferImpl<material_e::CoupledUP>;
   PREC length = DOMAIN_LENGTH; // Domain total length [m] (scales volume, etc.)
-  PREC rho = DENSITY;
+  PREC rho = DENSITY; // density of the mixture rho = (1-n)*rho_s + n*rho_w
   PREC volume = DOMAIN_VOLUME * 
       (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
        MODEL_PPC);
@@ -1717,10 +1717,12 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
 
   PREC rhow = 1.0e3; // water density
   PREC alpha1 = 1.0; // Biot coef.
-  PREC poro = 0.9; // porosity
+  PREC poro = 0.2; // porosity
   PREC Kf = 1.0e7; // Water compresibility
   PREC Ks = 2.2e7; // Soil grain compresibility
   PREC Kperm = 1.0e-5; // Isothropic permeabily
+  PREC Q_inv = poro/Kf + (alpha1-poro)/Ks; // +poro/Kf + (alpha1-poro)/Ks = 9.45e-8;
+  PREC masw = (poro * volume * rhow); // liquid phase mass
 
   bool use_ASFLIP = false; //< Use ASFLIP/PIC mixing? Default off.
   PREC alpha = 0.0;  //< FLIP/PIC Mixing Factor [0.1] -> [PIC, FLIP]
@@ -1752,6 +1754,8 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
     Kf = mat.Kf;
     Ks = mat.Ks;
     Kperm = mat.Kperm;
+    masw = (poro * volume * rhow);
+    Q_inv = poro/Kf + (alpha1-poro)/Ks;
 
     beta_min = algo.ASFLIP_beta_min;
     beta_max = algo.ASFLIP_beta_max;
@@ -1874,7 +1878,7 @@ template <>
 struct ParticleBuffer<material_e::NACC> : ParticleBufferImpl<material_e::NACC> {
   using base_t = ParticleBufferImpl<material_e::NACC>;
   PREC length = DOMAIN_LENGTH; // Domain total length [m] (scales volume, etc.)
-  PREC rho = DENSITY;
+  PREC rho = DENSITY; 
   PREC volume = DOMAIN_VOLUME * (1.f / (1 << DOMAIN_BITS) / (1 << DOMAIN_BITS) /
                   (1 << DOMAIN_BITS) / MODEL_PPC);
   PREC mass = (volume * DENSITY);

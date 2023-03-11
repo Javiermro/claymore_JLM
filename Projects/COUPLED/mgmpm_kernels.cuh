@@ -1119,6 +1119,7 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
     for (int cidib = threadIdx.x % 32; cidib < g_blockvolume; cidib += 32) 
     {
       PREC_G mass = grid_block.val_1d(_0, cidib), vel[3], vel_FLIP[3];
+      PREC_G masw = grid_block.val_1d(_7, cidib), pw; // liquid mass, water pore pressure
       if (mass > 0.f) 
       {
         mass = (1.0 / mass);
@@ -1142,6 +1143,7 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
         vel_FLIP[0] = grid_block.val_1d(_4, cidib); //< mvx
         vel_FLIP[1] = grid_block.val_1d(_5, cidib); //< mvy
         vel_FLIP[2] = grid_block.val_1d(_6, cidib); //< mvz
+        if (masw > 0.f) pw = grid_block.val_1d(_8, cidib) / masw; //< mvy+dt(fint) 
 
         int isInBound = 0;
 
@@ -1506,6 +1508,8 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
         grid_block.val_1d(_6, cidib) = vel_FLIP[2];
         grid_block.val_1d(_7, cidib) = 0.f;
         grid_block.val_1d(_8, cidib) = 0.f;
+        grid_block.val_1d(_9, cidib) = masw;
+        grid_block.val_1d(_10, cidib) = pw;
 
       }
       // Max velSqr in warp saved to first core's register in warp (threadIdx.x % 32 == 0)
@@ -4187,8 +4191,7 @@ __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
       pos += dt * (vel + beta * pbuffer.alpha * (vel_p - vel_FLIP)); //< pos update
       vel += pbuffer.alpha * (vel_p - vel_FLIP); //< vel update
 
-      PREC pw;
-      pw = 0.0;
+      PREC pw= 0.0;
 
       compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda,
                           pbuffer.cohesion, pbuffer.beta, pbuffer.yieldSurface,
@@ -9432,16 +9435,27 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
 
   extern __shared__ char shmem[];
   using ViArena =
-      PREC_G(*)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(*)[10][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
   using ViArenaRef =
-      PREC_G(&)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(&)[10][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
   ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
   using MViArena =
-      PREC_G(*)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(*)[9][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
   using MViArenaRef =
-      PREC_G(&)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(&)[9][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
   MViArenaRef __restrict__ p2gbuffer =
       *reinterpret_cast<MViArena>(shmem + shmem_offset * sizeof(PREC_G));
+  // using ViArena =
+  //     PREC_G(*)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // using ViArenaRef =
+  //     PREC_G(&)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
+  // using MViArena =
+  //     PREC_G(*)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // using MViArenaRef =
+  //     PREC_G(&)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // MViArenaRef __restrict__ p2gbuffer =
+  //     *reinterpret_cast<MViArena>(shmem + shmem_offset * sizeof(PREC_G));
 
   ivec3 blockid;
   int src_blockno;
@@ -9461,6 +9475,9 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
   if (ppb == 0) return; // Return early if no particles
 
 
+
+
+
   for (int base = threadIdx.x; base < numViInArena; base += blockDim.x) {
     char local_block_id = base / numViPerBlock;
     auto blockno = partition.query(
@@ -9477,22 +9494,25 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
 
     PREC_G val;
     if (channelid == 0) 
-      val = grid_block.val_1d(_1, c);
+      val = grid_block.val_1d(_1, c); // vel(1) + dt*fint(1)
     else if (channelid == 1)
       val = grid_block.val_1d(_2, c);
     else if (channelid == 2)
       val = grid_block.val_1d(_3, c);
     else if (channelid == 3) 
-      val = grid_block.val_1d(_4, c);
+      val = grid_block.val_1d(_4, c); // vel(1)
     else if (channelid == 4) 
       val = grid_block.val_1d(_5, c);
     else if (channelid == 5) 
       val = grid_block.val_1d(_6, c);
     else if (channelid == 6) 
-      val = grid_block.val_1d(_7, c);
+      val = grid_block.val_1d(_7, c); // Vol
     else if (channelid == 7) 
-      val = grid_block.val_1d(_8, c);
-    g2pbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)]
+      val = grid_block.val_1d(_8, c); // J
+    else if (channelid == 8) 
+      val = grid_block.val_1d(_10, c); // pw
+    g2pbuffer[channelid]
+             [cx + (local_block_id & 4 ? g_blocksize : 0)]
              [cy + (local_block_id & 2 ? g_blocksize : 0)]
              [cz + (local_block_id & 1 ? g_blocksize : 0)] = val;
   }
@@ -9556,7 +9576,8 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
 
     // Dp^n = Dp^n+1 = (1/4) * dx^2 * I (Quad.)
     PREC Dp_inv; //< Inverse Intertia-Like Tensor (1/m^2)
-    PREC scale = pbuffer.length * pbuffer.length; //< Area scale (m^2)
+    PREC scale;
+    scale = pbuffer.length * pbuffer.length; //< Area scale (m^2)
     Dp_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
 
 #pragma unroll 3
@@ -9583,6 +9604,9 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
           PREC sJBar_i = g2pbuffer[7][local_base_index[0] + i][local_base_index[1] + j]
                             [local_base_index[2] + k] / g2pbuffer[6][local_base_index[0] + i][local_base_index[1] + j]
                             [local_base_index[2] + k];
+
+          PREC pw = g2pbuffer[8][local_base_index[0] + i][local_base_index[1] + j]
+                            [local_base_index[2] + k];
           vel   += vi * W;
           vel_FLIP += vi_n * W; 
           C[0] += W * vi[0] * xixp[0] * scale;
@@ -9608,7 +9632,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       PREC sJBar;
       PREC ID;
       PREC pw;
-      pw = 0.0;
+      // pw = 0.0;
       auto source_particle_bin = pbuffer.ch(_0, source_blockno);
       contrib[0] = source_particle_bin.val(_3, source_pidib % g_bin_capacity);
       contrib[1] = source_particle_bin.val(_4, source_pidib % g_bin_capacity);
@@ -9631,7 +9655,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       
       PREC JInc = matrixDeterminant3d(dws.data());
       PREC J  = matrixDeterminant3d(F.data());
-      //PREC voln = J * pbuffer.volume;
+      // PREC voln = J * pbuffer.volume;
 
       PREC beta; //< Position correction factor (ASFLIP)
       if ((1.0 - sJBar_new) >= 1.0) beta = pbuffer.beta_max;  // beta max
@@ -9671,12 +9695,11 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
         particle_bin.val(_14, pidib % g_bin_capacity) = vel[1];
         particle_bin.val(_15, pidib % g_bin_capacity) = vel[2];
         particle_bin.val(_16, pidib % g_bin_capacity) = sJBar_new;
-        particle_bin.val(_18, pidib % g_bin_capacity) = ID;
         particle_bin.val(_17, pidib % g_bin_capacity) = pw;
+        particle_bin.val(_18, pidib % g_bin_capacity) = ID;
       }
 
       {
-
       contrib = (C * pbuffer.mass - contrib * newDt) * Dp_inv;
       }
     }
@@ -9706,6 +9729,10 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       local_base_index[dd] = (((base_index[dd] - 1) & g_blockmask) + 1) +
                              local_base_index[dd] - base_index[dd];
     }
+ 
+    scale = pbuffer.length * pbuffer.length; //< Area scale (m^2) 
+    PREC M_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
+      PREC pw;
 #pragma unroll 3
     for (char i = 0; i < 3; i++)
 #pragma unroll 3
@@ -9715,47 +9742,67 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
           pos = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
           PREC W = dws(0, i) * dws(1, j) * dws(2, k);
           PREC wm = pbuffer.mass * W;
+          PREC wmw = pbuffer.masw * W;
+          PREC newDtKm = newDt * pbuffer.Kperm * pbuffer.masw;
           atomicAdd(
               &p2gbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
               wm);
+
           atomicAdd(
               &p2gbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
-              wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] +
-                             contrib[6] * pos[2]) *
-                                W);
+              wmw);
           atomicAdd(
               &p2gbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
               wm * vel[1] + (contrib[1] * pos[0] + contrib[4] * pos[1] +
-                             contrib[7] * pos[2]) *
-                                W);
+                             contrib[7] * pos[2]) * W);
           atomicAdd(
               &p2gbuffer[3][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
               wm * vel[2] + (contrib[2] * pos[0] + contrib[5] * pos[1] +
-                             contrib[8] * pos[2]) *
-                                W);
+                             contrib[8] * pos[2]) * W);
+
           // ASFLIP unstressed velocity
           atomicAdd(
               &p2gbuffer[4][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
-              wm * (vel[0] + Dp_inv * (C[0] * pos[0] + C[3] * pos[1] +
-                             C[6] * pos[2])));
+              wm * (vel[0] + Dp_inv * (C[0] * pos[0] + C[3] * pos[1] + C[6] * pos[2])));
           atomicAdd(
               &p2gbuffer[5][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
-              wm * (vel[1] + Dp_inv * (C[1] * pos[0] + C[4] * pos[1] +
-                             C[7] * pos[2])));
+              wm * (vel[1] + Dp_inv * (C[1] * pos[0] + C[4] * pos[1] + C[7] * pos[2])));
           atomicAdd(
               &p2gbuffer[6][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
-              wm * (vel[2] + Dp_inv * (C[2] * pos[0] + C[5] * pos[1] +
-                             C[8] * pos[2])));
+              wm * (vel[2] + Dp_inv * (C[2] * pos[0] + C[5] * pos[1] + C[8] * pos[2])));
+
+
+          atomicAdd(
+              &p2gbuffer[9][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wmw);
+          
+          
+          atomicAdd(
+              &p2gbuffer[10][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wmw * pbuffer.Q_inv * pw 
+              - (newDtKm * pow(M_inv*W,2) * (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]))*pw 
+              - newDt * pbuffer.alpha1 * M_inv * W * wmw * (pos[0] * vel[0] + pos[1] * vel[1] + pos[2] * vel[2]) );
+
         }
   }
   __syncthreads();
+
+
+
+
+
+
+
+
   /// arena no, channel no, cell no
   for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
     char local_block_id = base / numMViPerBlock;
@@ -9787,6 +9834,10 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       atomicAdd(&next_grid.ch(_0, blockno).val_1d(_5, c), val);
     } else if (channelid == 6) {
       atomicAdd(&next_grid.ch(_0, blockno).val_1d(_6, c), val);
+    } else if (channelid == 9) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_9, c), val);
+    } else if (channelid == 10) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_10, c), val);
     }
   }
 }

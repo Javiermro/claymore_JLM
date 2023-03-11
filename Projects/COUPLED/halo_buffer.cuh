@@ -21,7 +21,7 @@ using grid_block_ =
                          structural_padding_policy::sum_pow2_align>,
                BlockDomain, attrib_layout::soa, fg_, fg_, fg_, fg_,
               fg_, fg_, fg_, 
-              fg_, fg_>; // mass, m(vel + dt*fint) (MLS), mvel (ASFLIP), Vol, JBar
+              fg_, fg_, fg_, fg_>; // mass, m(vel + dt*fint) (MLS), mvel (ASFLIP), Vol, JBar, pw, masw
 
 /// Halo Grid-Block structure
 struct HaloGridBlocks {

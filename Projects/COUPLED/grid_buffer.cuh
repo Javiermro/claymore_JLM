@@ -20,9 +20,9 @@ using grid_block_f32_ =
                decorator<structural_allocation_policy::full_allocation,
                          structural_padding_policy::sum_pow2_align>,
                BlockDomain, attrib_layout::soa, f32_, f32_, f32_, f32_,
-               f32_, f32_, f32_, f32_, f32_>; //< mass, vel + dt*fint, 
+               f32_, f32_, f32_, f32_, f32_, f32_, f32_>; //< mass, vel + dt*fint, 
                                               //< vel, 
-                                              //< Vol, J
+                                              //< Vol, J, masw, pw
 using grid_f32_ =
     structural<structural_type::dense,
                decorator<structural_allocation_policy::full_allocation,
@@ -39,9 +39,9 @@ using grid_block_ =
                decorator<structural_allocation_policy::full_allocation,
                          structural_padding_policy::sum_pow2_align>,
                BlockDomain, attrib_layout::soa, fg_, fg_, fg_, fg_,
-               fg_, fg_, fg_, fg_, fg_>; //< mass, vel + dt*fint, 
+               fg_, fg_, fg_, fg_, fg_, fg_, fg_>; //< mass, vel + dt*fint, 
                                               //< vel, 
-                                              //< Vol, J
+                                              //< Vol, J, pw, masw
 using grid_ =
     structural<structural_type::dense,
                decorator<structural_allocation_policy::full_allocation,

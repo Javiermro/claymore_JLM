@@ -1123,7 +1123,8 @@ struct mgsp_benchmark {
 
                 // p2g F-Bar - Non-Halo
                 timer.tick();
-                shmem = (8 + 7) * (g_arenavolume * sizeof(PREC_G));
+                shmem = (10 + 9) * (g_arenavolume * sizeof(PREC_G));
+                // shmem = (8 + 7) * (g_arenavolume * sizeof(PREC_G));
                 checkCudaErrors(cudaFuncSetAttribute(p2g_FBar<std::decay_t<decltype(particleBins[rollid][did][mid])>, std::decay_t<decltype(partitions[rollid ^ 1][did])>, std::decay_t<decltype(gridBlocks[0][did])>>, cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxShared));
                 cuDev.compute_launch(
                     {pbcnt[did], g_particle_batch, shmem}, 

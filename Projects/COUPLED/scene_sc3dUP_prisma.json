@@ -1,0 +1,93 @@
+{
+	"simulation": { 
+		"gravity": -9.81,
+		"fps": 50,
+		"frames": 50,
+		"default_dt": 1e-4,
+		"default_dx": 0.05,
+		"domain": [2.50, 0.50, 2.50],
+		"save_path": "./",
+		"save_suffix": ".bgeo"
+	},
+	"models": [
+		{
+			"model": 0,
+			"gpu": 0,
+			"type": "particles", 
+			"color": "yellow",
+			"constitutive": "CoupledUP",
+			"output_attribs": ["VonMisesStress", "Velocity_X", "Pressure"],
+			"track_particle_id": [0],
+			"track_attribs": ["Velocity_X"],
+			"target_attribs": ["Position_Y"],
+			"ppc": 8,
+			"CFL": 0.5,
+			"rho": 1650,
+			"youngs_modulus": 1e7,
+			"poisson_ratio": 0.3,
+			"friction_angle": 40,
+			"cohesion": 0.0005,
+			"xi": 0.8,
+			"rhow": 1e3,
+			"alpha1": 1.0,
+			"poro": 0.9,
+			"Kf": 1e7,
+			"Ks": 2.2e7,
+			"Kperm": 1e-5,
+			"hardeningOn": true,
+			"logJp0": 0,
+			"beta": 1,
+			"SandVolCorrection": true,
+			"use_ASFLIP": true,
+			"use_FEM": false,
+			"use_FBAR": true,
+			"alpha": 0,
+			"beta_min": 0,
+			"beta_max": 0,
+			"FBAR_ratio": 0.99,
+			"velocity": [0, 0, 0],
+			"geometry": [
+				{
+					"object": "Box",
+					"operation": "Add",
+					"span": [0.1, 0.4, 0.1],
+					"offset": [1.2, 0.0, 1.2],
+					"array": [1, 1, 1],
+					"spacing": [0, 0, 0],
+					"rotate": [0, 0, 0],
+					"fulcrum": [0, 0, 0]
+				}
+			],
+			"partition_start": [0, 0, 0],
+			"partition_end": [2.50, 0.50, 2.50]
+		}
+	],
+	"grid-boundaries": [
+		{
+			"object": "Wall",
+			"contact": "Separable",
+			"domain_start": [0.0, 0.0, 0.0],
+			"domain_end": [2.50, 0.50, 2.50],
+			"time": [0, 60]
+		}
+	],
+	"grid-targets": [
+		{
+			"attribute": "Force",
+			"operation": "Sum",
+			"direction": "X+",
+			"output_frequency": 120,
+			"domain_start": [0, 0, 0],
+			"domain_end": [2.50, 0.50, 2.50]
+		}
+	],
+	"particle-targets": [
+		{
+			"attribute": "Elevation",
+			"operation": "Max",
+			"output_frequency": 120,
+			"domain_start": [0, 0, 0],
+			"domain_end":  [2.50, 0.50, 2.50]
+		}
+	]
+}
