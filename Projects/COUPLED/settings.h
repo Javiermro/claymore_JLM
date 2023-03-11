@@ -48,8 +48,8 @@ enum class material_e { JFluid, JFluid_ASFLIP, JFluid_FBAR, JBarFluid,
                         FixedCorotated, FixedCorotated_ASFLIP, FixedCorotated_ASFLIP_FBAR,
                         NeoHookean_ASFLIP_FBAR,
                         Sand, 
-                        CoupledUP, 
                         NACC, 
+                        CoupledUP,
                         Meshed,
                         Total };
 
@@ -58,17 +58,19 @@ enum class fem_e {  Tetrahedron, Tetrahedron_FBar,
                     Brick, //< Not implemented yet
                     Total };
 
+
 /// * For convenience, binds I/O sizes to compile-time variable names
 /// * Guarantees someone avoids unimplemented sizes (e.g. -1, 10004)
 /// TODO : Make this run-time to avoid lengthy compilitation of templates
 enum class num_attribs_e : int { Zero = 0, One = 1, Two = 2, Three = 3,
                                  Four = 4, Five = 5, Six = 6, Seven = 7,
-                                 Eight = 8, Nine = 9, Ten = 10, 
-                                 Eleven = 11, Twelve = 12 , Thirteen = 13
+                                 Eight = 8, Nine = 9 //, Ten = 10, 
+                                 // Eleven = 11, Twelve = 12 , Thirteen = 13
                                 //  Fourteen = 14, Fifteen = 15, Sixteen = 16, 
                                 //  Eighteen = 18, Twentyfour = 24, Thirtytwo = 32 
                                  };
-
+#define DEBUG_COUPLED_UP true
+constexpr bool g_debug_CoupledUP = DEBUG_COUPLED_UP; //< Debugging for CoupleUP
 /// https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html, F.3.16.5
 namespace config /// * Simulation config setup and name-space
 {
@@ -78,8 +80,9 @@ namespace config /// * Simulation config setup and name-space
 // ! You will get errors if exceeding num. of:
 // ! (i) Physical GPUs, check 'nvidia-smi' in terminal, (ii) Max. compiled particle models per GPU
 constexpr int g_device_cnt = 1; //< IMPORTANT. Num. GPUs to compile for. Default 1.
-constexpr int g_models_per_gpu = 3; //< IMPORTANT. Max num. particle models per GPU. Default 1.
+constexpr int g_models_per_gpu = 2; //< IMPORTANT. Max num. particle models per GPU. Default 1.
 constexpr int g_model_cnt = g_device_cnt * g_models_per_gpu; //< Max num. particle models in sim.
+
 
 // Run-time/animation default settings
 constexpr int g_log_level = 2; //< 0 = Print Nothing, 1 = + Errors, 2 = + Warnings, 3 = + Info/Tips.
@@ -122,12 +125,12 @@ constexpr double g_domain_volume = g_length * g_length * g_length;
 constexpr double g_grid_ratio_x = g_length_x / g_length + 0.0 * g_dx; //< Domain x ratio
 constexpr double g_grid_ratio_y = g_length_y / g_length + 0.0 * g_dx; //< Domain y ratio
 constexpr double g_grid_ratio_z = g_length_z / g_length + 0.0 * g_dx; //< Domain z ratio
-// constexpr int g_grid_size_x = (g_grid_size * g_grid_ratio_x + 0.5) ; //< Domain x grid-blocks
-// constexpr int g_grid_size_y = (g_grid_size * g_grid_ratio_y + 0.5) ; //< Domain y grid-blocks
-// constexpr int g_grid_size_z = (g_grid_size * g_grid_ratio_z + 0.5) ; //< Domain z grid-blocks
-constexpr int g_grid_size_x = g_grid_size ; //< Domain x grid-blocks
-constexpr int g_grid_size_y = g_grid_size ; //< Domain y grid-blocks
-constexpr int g_grid_size_z = g_grid_size ; //< Domain z grid-blocks
+constexpr int g_grid_size_x = (g_grid_size * g_grid_ratio_x + 0.5) ; //< Domain x grid-blocks
+constexpr int g_grid_size_y = (g_grid_size * g_grid_ratio_y + 0.5) ; //< Domain y grid-blocks
+constexpr int g_grid_size_z = (g_grid_size * g_grid_ratio_z + 0.5) ; //< Domain z grid-blocks
+//constexpr int g_grid_size_x = g_grid_size ; //< Domain x grid-blocks
+//constexpr int g_grid_size_y = g_grid_size ; //< Domain y grid-blocks
+//constexpr int g_grid_size_z = g_grid_size ; //< Domain z grid-blocks
 
 
 /// ------------------
@@ -143,7 +146,7 @@ constexpr int g_max_active_block = 1000; //< Max active blocks in gridBlocks. Pr
 
 // * Particles
 #define MAX_PPC 64 //< VERY important. Max particles-per-cell. Substantially effects memory/performance, exceeding MAX_PPC deletes particles. Generally, use MAX_PPC = 8*(Actual PPC) to account for compression.
-constexpr int g_max_particle_num = 100000; //< Max no. particles. Preallocated, can resize.
+constexpr int g_max_particle_num = 1000000; //< Max no. particles. Preallocated, can resize.
 constexpr int g_max_ppc = MAX_PPC; //< Default max_ppc
 constexpr int g_bin_capacity = 1 * 32; //< Particles per particle bin. Multiple of 32
 constexpr int g_particle_batch_capacity = 4 * g_bin_capacity; // Sets thread block size in g2p2g, etc. Usually 128, 256, or 512 is good. If kernel uses a lot of shared memory (e.g. 32kB+ when using FBAR and ASFLIP) then raise num. for occupancy benefits. If said kernel uses a lot of registers (e.g. 64+), then lower for occupancy. See CUDA occupancy calculator onlin
@@ -155,7 +158,9 @@ constexpr std::size_t g_max_particle_bin =
 constexpr std::size_t calc_particle_bin_count(std::size_t numActiveBlocks) noexcept {
     return numActiveBlocks * (g_max_ppc * g_blockvolume / g_bin_capacity); } //< Return max particle bins that fit in the active blocks 
 constexpr int g_particle_attribs = 3; //< No. attribute values to output per particle 
-constexpr int g_max_particle_attribs = 13; //< No. attribute values to output per particle 
+constexpr int g_max_particle_attribs = 9; //< No. attribute values to output per particle 
+
+
 constexpr bool g_buckets_on_particle_buffer = true; //< Controls if particle cell/block buckets, etc. are on partition (false) or particle-buffer (true). Used for compatability with original Multi-GPU and Single-GPU data-structure setup. Having them on particle buffer may be better if multiiple models per GPU
 
 
@@ -172,8 +177,8 @@ constexpr int g_max_grid_target_nodes = 16384; //< Max grid-nodes per gridTarget
 constexpr int g_grid_target_attribs = 10; //< No. of values per gridTarget node
 
 // * Particle-Targets
-constexpr int g_particle_target_cells = 15000; //< Max grid-nodes per gridTarget
-constexpr int g_max_particle_target_nodes = 15000; //< Max particless per particleTarget
+constexpr int g_particle_target_cells = 4096 * 4; //< Max grid-nodes per gridTarget
+constexpr int g_max_particle_target_nodes = 4096 * 4; //< Max particless per particleTarget
 constexpr int g_particle_target_attribs = 10; //< No. of values per gridTarget node
 constexpr int g_track_ID = 0; //< ID of particle to track, [0, g_max_fem_vertice_num)
 std::vector<int> g_track_IDs = {g_track_ID}; //< IDs of particles to track
@@ -231,7 +236,8 @@ struct MaterialConfigs {
   bool hardeningOn;
   PREC rhow, alpha1, poro, Kf, Ks, Kperm;
   MaterialConfigs() : ppc(8.0), rho(1e3), bulk(2.2e7), visco(1e-3), gamma(7.1), E{1e7}, nu{0.3}, logJp0(0.), frictionAngle(30.), cohesion(0.), beta(0.5), volumeCorrection(false), xi(1.0), hardeningOn(true), rhow(1e3), alpha1(1.0), poro(0.2), Kf(1.0e7), Ks(2.2e7), Kperm(1.0e-5) {}
-  MaterialConfigs(PREC p, PREC density, PREC k, PREC v, PREC g, PREC e, PREC pr, PREC j, PREC fa, PREC c, PREC b, bool volCorrection, PREC x, bool hard, PREC densityw, PREC a1, PREC por, PREC Kflu, PREC Ksol, PREC perm) : ppc(p), rho(density), bulk(k), visco(v), gamma(g), E(e), nu(pr), logJp0(j), frictionAngle(fa), cohesion(c), beta(b), volumeCorrection(false), xi(x), hardeningOn(hard), rhow(densityw), alpha1(a1), poro(por), Kf(Kflu), Ks(Ksol), Kperm(perm) {}
+  // MaterialConfigs(PREC p, PREC density, PREC k, PREC v, PREC g, PREC e, PREC pr, PREC j, PREC fa, PREC c, PREC b, bool volCorrection, PREC x, bool hard, PREC densityw, PREC a1, PREC por, PREC Kflu, PREC Ksol, PREC perm) : ppc(p), rho(density), bulk(k), visco(v), gamma(g), E(e), nu(pr), logJp0(j), frictionAngle(fa), cohesion(c), beta(b), volumeCorrection(false), xi(x), hardeningOn(hard), rhow(densityw), alpha1(a1), poro(por), Kf(Kflu), Ks(Ksol), Kperm(perm) {}
+
   ~MaterialConfigs() {}
 };
 
@@ -243,6 +249,48 @@ struct AlgoConfigs {
   PREC FBAR_ratio;
   AlgoConfigs() : use_ASFLIP(true), use_FEM{false}, use_FBAR(false), ASFLIP_alpha(0.), ASFLIP_beta_min(0.), ASFLIP_beta_max(0.), FBAR_ratio(0.) {}
   ~AlgoConfigs() {}
+};
+
+
+enum class boundary_contact_t { Sticky, Slip, Separate, Separable = Separate};
+enum class boundary_object_t { Walls, Box, Sphere, Cylinder, Plane, OSU_LWF_RAMP, OSU_LWF_PADDLE, USGS_RAMP, USGS_GATE };
+
+struct GridBoundaryConfigs {
+  int _ID; //< Specific grid-target ID, [0, number_of_targets)
+  vec<float, 3> _domain_start; //< Start of domain
+  vec<float, 3> _domain_end; //< End of domain
+  boundary_object_t _object;
+  boundary_contact_t _contact;
+  float _friction_static, _friction_dynamic;
+  vec<float, 2> _time;
+  vec3 _normal;
+  vec3 _trans, _transVel;
+  vec3x3 _rotMat;
+  vec3 _omega; 
+  // Default constructor
+  GridBoundaryConfigs() {
+    _ID = 0;
+    _domain_start.set(0.f);
+    _domain_end.set(0.f);
+    _object = boundary_object_t::Walls;
+    _contact = boundary_contact_t::Sticky;
+    _friction_static = 0.f;
+    _friction_dynamic = 0.f;
+    _time.set(0.f);
+    _normal.set(0.f);
+    _rotMat.set(0.f);
+    _rotMat(0, 0) = _rotMat(1, 1) = _rotMat(2, 2) = 1.f;
+    _trans.set(0.f);
+    _transVel.set(0.f);
+    _omega.set(0.f);
+  }
+  // Copy constructor
+  GridBoundaryConfigs(const GridBoundaryConfigs& other) = default;
+  // Copy assignment
+  GridBoundaryConfigs& operator=( const GridBoundaryConfigs& ) = default;
+  // Default destructor
+  ~GridBoundaryConfigs() {}
+
 };
 
 struct GridTargetConfigs 

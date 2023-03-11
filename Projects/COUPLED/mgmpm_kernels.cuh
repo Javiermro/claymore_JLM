@@ -279,7 +279,8 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer,
   // TODO : Clean this up to use a loop and enums
   getParticleAttrib(pattrib, i, parid, val); 
   i=i+1;
-  PREC sJ = val; J = 1-sJ;
+  J = val; 
+  PREC sJ = 1.0-J;
 
   getParticleAttrib(pattrib, i, parid, val); 
   i=i+1;
@@ -301,7 +302,7 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer,
   PREC sJBar = val;
 
   // TODO : Init. with material's Cauchy stress, not just pressure for fluid
-  PREC pressure =  (6e7 / 7.1) * (  pow((1.0-sJBar), -7.1) - 1.0 );
+  PREC pressure =  (2.2e8 / 7.1) * (  pow((1.0-sJBar), -7.1) - 1.0 );
   PREC voln = J * volume;
   contrib[0] = - pressure * voln;
   contrib[4] = - pressure * voln;
@@ -756,7 +757,7 @@ __global__ void array_to_buffer(ParticleArray parray, ParticleAttrib<num_attribs
     pbin.val(_1, pidib % g_bin_capacity) = parray.val(_1, parid);
     pbin.val(_2, pidib % g_bin_capacity) = parray.val(_2, parid);
     /// J
-    pbin.val(_3, pidib % g_bin_capacity) = pattribs.val(_0, parid); //< (1 - J) = (1 - V/Vo)
+    pbin.val(_3, pidib % g_bin_capacity) = 1.0 - pattribs.val(_0, parid); //< (1 - J) = (1 - V/Vo)
     /// vel (ASFLIP)
     pbin.val(_4, pidib % g_bin_capacity) = pattribs.val(_1, parid); //< Vel_x m/s
     pbin.val(_5, pidib % g_bin_capacity) = pattribs.val(_2, parid); //< Vel_y m/s
@@ -966,10 +967,9 @@ __global__ void array_to_buffer(ParticleArray parray,
   }
 }
 
-
 template <typename ParticleArray, typename Partition>
 __global__ void array_to_buffer(ParticleArray parray,
-                                ParticleBuffer<material_e::CoupledUP> pbuffer,
+                                ParticleBuffer<material_e::NACC> pbuffer,
                                 Partition partition, vec<PREC, 3> vel) {
   uint32_t blockno = blockIdx.x;
   int pcnt = (g_buckets_on_particle_buffer) 
@@ -1007,9 +1007,10 @@ __global__ void array_to_buffer(ParticleArray parray,
 }
 
 
+
 template <typename ParticleArray, typename Partition>
 __global__ void array_to_buffer(ParticleArray parray,
-                                ParticleBuffer<material_e::NACC> pbuffer,
+                                ParticleBuffer<material_e::CoupledUP> pbuffer,
                                 Partition partition, vec<PREC, 3> vel) {
   uint32_t blockno = blockIdx.x;
   int pcnt = (g_buckets_on_particle_buffer) 
@@ -1042,7 +1043,9 @@ __global__ void array_to_buffer(ParticleArray parray,
     pbin.val(_14, pidib % g_bin_capacity) = vel[1];
     pbin.val(_15, pidib % g_bin_capacity) = vel[2];
     pbin.val(_16, pidib % g_bin_capacity) = 0.0; //< sJBar
-    pbin.val(_17, pidib % g_bin_capacity) = (PREC)parid; //< Particle ID
+    pbin.val(_17, pidib % g_bin_capacity) = (PREC)parid; //< mass_water CoupledUP
+    pbin.val(_18, pidib % g_bin_capacity) = (PREC)parid; //< CoupledUP
+    pbin.val(_19, pidib % g_bin_capacity) = (PREC)parid; //< Particle ID
   }
 }
 
@@ -1088,7 +1091,7 @@ __global__ void array_to_buffer(ParticleArray parray,
 template <typename Grid, typename Partition, int boundary_cnt>
 __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
                                                Partition partition, float dt,
-                                               float *maxVel, float curTime, float grav, 
+                                               float *maxVel, float curTime, pvec3 grav, 
                                                vec<vec7, boundary_cnt> boundary_array, 
                                                vec3 boundary_motion, PREC length) 
 {
@@ -1119,7 +1122,6 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
     for (int cidib = threadIdx.x % 32; cidib < g_blockvolume; cidib += 32) 
     {
       PREC_G mass = grid_block.val_1d(_0, cidib), vel[3], vel_FLIP[3];
-      PREC_G masw = grid_block.val_1d(_7, cidib), pw; // liquid mass, water pore pressure
       if (mass > 0.f) 
       {
         mass = (1.0 / mass);
@@ -1143,7 +1145,6 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
         vel_FLIP[0] = grid_block.val_1d(_4, cidib); //< mvx
         vel_FLIP[1] = grid_block.val_1d(_5, cidib); //< mvy
         vel_FLIP[2] = grid_block.val_1d(_6, cidib); //< mvz
-        if (masw > 0.f) pw = grid_block.val_1d(_8, cidib) / masw; //< mvy+dt(fint) 
 
         int isInBound = 0;
 
@@ -1491,7 +1492,7 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
 
         // * External body forces applied (i.e. gravity)
         // ! May need to be moved after all boundary conditions, or before initial update
-#if 1
+#if 0
         vel[1] += grav / l * dt;  //< fg = dt * g, Grav. force
 #else 
         for (int d=0; d<3; d++) vel[d] += grav[d] / l * dt; // 
@@ -1508,8 +1509,6 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
         grid_block.val_1d(_6, cidib) = vel_FLIP[2];
         grid_block.val_1d(_7, cidib) = 0.f;
         grid_block.val_1d(_8, cidib) = 0.f;
-        grid_block.val_1d(_9, cidib) = masw;
-        grid_block.val_1d(_10, cidib) = pw;
 
       }
       // Max velSqr in warp saved to first core's register in warp (threadIdx.x % 32 == 0)
@@ -1545,7 +1544,7 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
                                                Partition partition, float dt,
                                                Boundary boundary,
                                                float *maxVel, float curTime,
-                                               float grav) {
+                                               PREC grav) {
   constexpr int bc = 2;
   constexpr int numWarps =
       g_num_grid_blocks_per_cuda_block * g_num_warps_per_grid_block;
@@ -1674,7 +1673,7 @@ __global__ void update_grid_FBar(uint32_t blockCount, Grid grid,
 template <typename Grid, typename Partition>
 __global__ void query_energy_grid(uint32_t blockCount, Grid grid, Partition partition, float dt, 
                                   PREC_G *sumKinetic, PREC_G *sumGravity, 
-                                  float curTime, float grav, 
+                                  float curTime, PREC grav, 
                                   vec<vec7, g_max_grid_boundaries> boundary_array, 
                                   vec3 boundary_motion, PREC length) {
   constexpr int numWarps =
@@ -1793,7 +1792,7 @@ __global__ void query_energy_grid(uint32_t blockCount, Grid grid, Partition part
 template <typename Partition, typename ParticleBuffer>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
                                 return;
 }
 
@@ -1801,7 +1800,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::JFluid> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -1850,7 +1849,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::JFluid_ASFLIP> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -1902,7 +1901,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::JBarFluid> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -1961,7 +1960,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::JFluid_FBAR> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -2008,7 +2007,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::FixedCorotated> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -2066,7 +2065,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::FixedCorotated_ASFLIP> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -2127,7 +2126,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::FixedCorotated_ASFLIP_FBAR> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -2190,7 +2189,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::NeoHookean_ASFLIP_FBAR> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -2257,7 +2256,7 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
 template <typename Partition>
 __global__ void query_energy_particles(Partition partition, Partition prev_partition,
                               ParticleBuffer<material_e::Sand> pbuffer,
-                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, float grav)  {
+                              PREC_G *kinetic_energy, PREC_G *gravity_energy, PREC_G *strain_energy, PREC grav)  {
   int pcnt = g_buckets_on_particle_buffer ? pbuffer._ppbs[blockIdx.x] : partition._ppbs[blockIdx.x];
   ivec3 blockid = partition._activeKeys[blockIdx.x];
   auto advection_bucket = g_buckets_on_particle_buffer
@@ -2315,7 +2314,6 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
   atomicAdd(gravity_energy, thread_gravity_energy);
   atomicAdd(strain_energy, thread_strain_energy);
 }
-
 
 
 template <typename Partition>
@@ -2379,7 +2377,6 @@ __global__ void query_energy_particles(Partition partition, Partition prev_parti
   atomicAdd(gravity_energy, thread_gravity_energy);
   atomicAdd(strain_energy, thread_strain_energy);
 }
-
 
 // %% ============================================================= %%
 //     MPM Grid-to-Particle-to-Grid Functions
@@ -3987,353 +3984,6 @@ __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
   }
 }
 
-
-
-template <typename Partition, typename Grid>
-__global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
-                      const ParticleBuffer<material_e::CoupledUP> pbuffer,
-                      ParticleBuffer<material_e::CoupledUP> next_pbuffer,
-                      const Partition prev_partition, Partition partition,
-                      const Grid grid, Grid next_grid) {
-  static constexpr uint64_t numViPerBlock = g_blockvolume * 6;
-  static constexpr uint64_t numViInArena = numViPerBlock << 3;
-
-  static constexpr uint64_t numMViPerBlock = g_blockvolume * 7;
-  static constexpr uint64_t numMViInArena = numMViPerBlock << 3;
-
-  static constexpr unsigned arenamask = (g_blocksize << 1) - 1;
-  static constexpr unsigned arenabits = g_blockbits + 1;
-
-  extern __shared__ char shmem[];
-  using ViArena =
-      float(*)[6][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  using ViArenaRef =
-      float(&)[6][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
-  using MViArena =
-      float(*)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  using MViArenaRef =
-      float(&)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  MViArenaRef __restrict__ p2gbuffer =
-      *reinterpret_cast<MViArena>(shmem + numViInArena * sizeof(float));
-
-  ivec3 blockid;
-  int src_blockno;
-  if (blocks != nullptr) { 
-    blockid = blocks[blockIdx.x]; // Halo block ID
-    src_blockno = partition.query(blockid); // Halo block number
-  } else { 
-    if (partition._haloMarks[blockIdx.x]) return; // Return early if halo block
-    blockid = partition._activeKeys[blockIdx.x]; // Non-halo block ID
-    src_blockno = blockIdx.x; // Non-halo block number
-  }
-  if (src_blockno < 0) return; // Return early if negative block number
-//  else if (src_blockno > blockcnt) return; // Return early if excessive block number
-  int ppb = g_buckets_on_particle_buffer
-            ? next_pbuffer._ppbs[src_blockno] 
-            : partition._ppbs[src_blockno]; // Particles in block
-  if (ppb == 0) return; // Return early if no particles
-
-
-  for (int base = threadIdx.x; base < numViInArena; base += blockDim.x) {
-    char local_block_id = base / numViPerBlock;
-    auto blockno = partition.query(
-        ivec3{blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0),
-              blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0),
-              blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-    auto grid_block = grid.ch(_0, blockno);
-    int channelid = base % numViPerBlock;
-    char c = channelid & 0x3f;
-    char cz = channelid & g_blockmask;
-    char cy = (channelid >>= g_blockbits) & g_blockmask;
-    char cx = (channelid >>= g_blockbits) & g_blockmask;
-    channelid >>= g_blockbits;
-
-    float val;
-    if (channelid == 0)
-      val = grid_block.val_1d(_1, c);
-    else if (channelid == 1)
-      val = grid_block.val_1d(_2, c);
-    else if (channelid == 2)
-      val = grid_block.val_1d(_3, c);
-    else if (channelid == 3)
-      val = grid_block.val_1d(_4, c);
-    else if (channelid == 4)
-      val = grid_block.val_1d(_5, c);
-    else if (channelid == 5)
-      val = grid_block.val_1d(_6, c);
-    g2pbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)]
-             [cy + (local_block_id & 2 ? g_blocksize : 0)]
-             [cz + (local_block_id & 1 ? g_blocksize : 0)] = val;
-  }
-  __syncthreads();
-  for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
-    int loc = base;
-    char z = loc & arenamask;
-    char y = (loc >>= arenabits) & arenamask;
-    char x = (loc >>= arenabits) & arenamask;
-    p2gbuffer[loc >> arenabits][x][y][z] = 0.f;
-  }
-  __syncthreads();
-
-  for (int pidib = threadIdx.x; pidib < ppb; pidib += blockDim.x) {
-    int source_blockno, source_pidib;
-    ivec3 base_index;
-    {
-      int advect = (g_buckets_on_particle_buffer)
-                    ? next_pbuffer._blockbuckets[src_blockno * g_particle_num_per_block + pidib]
-                    : partition._blockbuckets[src_blockno * g_particle_num_per_block + pidib];
-      dir_components(advect / g_particle_num_per_block, base_index);
-      base_index += blockid;
-      source_blockno = prev_partition.query(base_index);
-      source_pidib = advect % g_particle_num_per_block; // & (g_particle_num_per_block - 1);
-      source_blockno = (g_buckets_on_particle_buffer)
-                        ? pbuffer._binsts[source_blockno] + source_pidib / g_bin_capacity
-                        : prev_partition._binsts[source_blockno] + source_pidib / g_bin_capacity;
-    }
-    pvec3 pos, vel_p;
-    {
-      auto source_particle_bin = pbuffer.ch(_0, source_blockno);
-      pos[0] = source_particle_bin.val(_0, source_pidib % g_bin_capacity);
-      pos[1] = source_particle_bin.val(_1, source_pidib % g_bin_capacity);
-      pos[2] = source_particle_bin.val(_2, source_pidib % g_bin_capacity);
-      vel_p[0] = source_particle_bin.val(_13, source_pidib % g_bin_capacity);
-      vel_p[1] = source_particle_bin.val(_14, source_pidib % g_bin_capacity);
-      vel_p[2] = source_particle_bin.val(_15, source_pidib % g_bin_capacity);
-    }
-    ivec3 local_base_index = (pos * g_dx_inv + 0.5f).cast<int>() - 1;
-    pvec3 local_pos = pos - local_base_index * g_dx;
-    base_index = local_base_index;
-
-    pvec3x3 dws;
-#pragma unroll 3
-    for (int dd = 0; dd < 3; ++dd) {
-      PREC d =
-          (local_pos[dd] - ((int)(local_pos[dd] * g_dx_inv + 0.5) - 1) * g_dx) *
-          g_dx_inv;
-      dws(dd, 0) = 0.5 * (1.5 - d) * (1.5 - d);
-      d -= 1.0;
-      dws(dd, 1) = 0.75 - d * d;
-      d = 0.5 + d;
-      dws(dd, 2) = 0.5 * d * d;
-      local_base_index[dd] = ((local_base_index[dd] - 1) & g_blockmask) + 1;
-    }
-    pvec3 vel, vel_FLIP;
-    vel.set(0.0);
-    vel_FLIP.set(0.0);
-    pvec9 C;
-    C.set(0.0);
-
-    // Dp^n = Dp^n+1 = (1/4) * dx^2 * I (Quad.)
-    PREC Dp_inv; //< Inverse Intertia-Like Tensor (1/m^2)
-    PREC scale = pbuffer.length * pbuffer.length; //< Area scale (m^2)
-    Dp_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
-    
-#pragma unroll 3
-    for (char i = 0; i < 3; i++)
-#pragma unroll 3
-      for (char j = 0; j < 3; j++)
-#pragma unroll 3
-        for (char k = 0; k < 3; k++) {
-          pvec3 xixp = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
-          PREC W = dws(0, i) * dws(1, j) * dws(2, k);
-          pvec3 vi{g2pbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k]};
-          pvec3 vi_n{g2pbuffer[3][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[4][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[5][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k]};
-          vel += vi * W;
-          vel_FLIP += vi_n * W;
-          C[0] += W * vi[0] * xixp[0] * scale;
-          C[1] += W * vi[1] * xixp[0] * scale;
-          C[2] += W * vi[2] * xixp[0] * scale;
-          C[3] += W * vi[0] * xixp[1] * scale;
-          C[4] += W * vi[1] * xixp[1] * scale;
-          C[5] += W * vi[2] * xixp[1] * scale;
-          C[6] += W * vi[0] * xixp[2] * scale;
-          C[7] += W * vi[1] * xixp[2] * scale;
-          C[8] += W * vi[2] * xixp[2] * scale;
-        }
-
-#pragma unroll 9
-    for (int d = 0; d < 9; ++d)
-      dws.val(d) = C[d] * dt * Dp_inv + ((d & 0x3) ? 0.0 : 1.0);
-
-    pvec9 contrib;
-    {
-      pvec9 F;
-      PREC logJp;
-      auto source_particle_bin = pbuffer.ch(_0, source_blockno);
-      contrib[0] = source_particle_bin.val(_3, source_pidib % g_bin_capacity);
-      contrib[1] = source_particle_bin.val(_4, source_pidib % g_bin_capacity);
-      contrib[2] = source_particle_bin.val(_5, source_pidib % g_bin_capacity);
-      contrib[3] = source_particle_bin.val(_6, source_pidib % g_bin_capacity);
-      contrib[4] = source_particle_bin.val(_7, source_pidib % g_bin_capacity);
-      contrib[5] = source_particle_bin.val(_8, source_pidib % g_bin_capacity);
-      contrib[6] = source_particle_bin.val(_9, source_pidib % g_bin_capacity);
-      contrib[7] = source_particle_bin.val(_10, source_pidib % g_bin_capacity);
-      contrib[8] = source_particle_bin.val(_11, source_pidib % g_bin_capacity);
-      logJp = source_particle_bin.val(_12, source_pidib % g_bin_capacity);
-      PREC ID = source_particle_bin.val(_16, source_pidib % g_bin_capacity);
-
-      matrixMatrixMultiplication3d(dws.data(), contrib.data(), F.data());
-      PREC J = matrixDeterminant3d(F.data());
-      PREC beta;
-      if (J >= 1.0) beta = pbuffer.beta_max; //< beta max
-      else beta = pbuffer.beta_min;          //< beta min
-      pos += dt * (vel + beta * pbuffer.alpha * (vel_p - vel_FLIP)); //< pos update
-      vel += pbuffer.alpha * (vel_p - vel_FLIP); //< vel update
-
-      PREC pw= 0.0;
-
-      compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda,
-                          pbuffer.cohesion, pbuffer.beta, pbuffer.yieldSurface,
-                          pbuffer.volumeCorrection, logJp, pw, F, contrib);
-      {
-        auto particle_bin = g_buckets_on_particle_buffer 
-            ? next_pbuffer.ch(_0, next_pbuffer._binsts[src_blockno] + pidib / g_bin_capacity) 
-            : next_pbuffer.ch(_0, partition._binsts[src_blockno] + pidib / g_bin_capacity);
-        particle_bin.val(_0, pidib % g_bin_capacity) = pos[0];
-        particle_bin.val(_1, pidib % g_bin_capacity) = pos[1];
-        particle_bin.val(_2, pidib % g_bin_capacity) = pos[2];
-        particle_bin.val(_3, pidib % g_bin_capacity) = F[0];
-        particle_bin.val(_4, pidib % g_bin_capacity) = F[1];
-        particle_bin.val(_5, pidib % g_bin_capacity) = F[2];
-        particle_bin.val(_6, pidib % g_bin_capacity) = F[3];
-        particle_bin.val(_7, pidib % g_bin_capacity) = F[4];
-        particle_bin.val(_8, pidib % g_bin_capacity) = F[5];
-        particle_bin.val(_9, pidib % g_bin_capacity) = F[6];
-        particle_bin.val(_10, pidib % g_bin_capacity) = F[7];
-        particle_bin.val(_11, pidib % g_bin_capacity) = F[8];
-        particle_bin.val(_12, pidib % g_bin_capacity) = logJp;
-        particle_bin.val(_13, pidib % g_bin_capacity) = vel[0];
-        particle_bin.val(_14, pidib % g_bin_capacity) = vel[1];
-        particle_bin.val(_15, pidib % g_bin_capacity) = vel[2];
-        particle_bin.val(_16, pidib % g_bin_capacity) = ID;
-
-      }
-
-      contrib = (C * pbuffer.mass - contrib * newDt) * Dp_inv;
-    }
-
-    local_base_index = (pos * g_dx_inv + 0.5f).cast<int>() - 1;
-    {
-      int direction_tag = dir_offset((base_index - 1) / g_blocksize -
-                              (local_base_index - 1) / g_blocksize);
-      if (g_buckets_on_particle_buffer)
-        next_pbuffer.add_advection(partition, local_base_index - 1, direction_tag, pidib);
-      else 
-        partition.add_advection(local_base_index - 1, direction_tag, pidib);
-    }
-    // dws[d] = bspline_weight(local_pos[d]);
-
-#pragma unroll 3
-    for (char dd = 0; dd < 3; ++dd) {
-      local_pos[dd] = pos[dd] - local_base_index[dd] * g_dx;
-      PREC d =
-          (local_pos[dd] - ((int)(local_pos[dd] * g_dx_inv + 0.5) - 1) * g_dx) *
-          g_dx_inv;
-      dws(dd, 0) = 0.5f * (1.5 - d) * (1.5 - d);
-      d -= 1.0f;
-      dws(dd, 1) = 0.75 - d * d;
-      d = 0.5f + d;
-      dws(dd, 2) = 0.5 * d * d;
-
-      local_base_index[dd] = (((base_index[dd] - 1) & g_blockmask) + 1) +
-                             local_base_index[dd] - base_index[dd];
-    }
-#pragma unroll 3
-    for (char i = 0; i < 3; i++)
-#pragma unroll 3
-      for (char j = 0; j < 3; j++)
-#pragma unroll 3
-        for (char k = 0; k < 3; k++) {
-          pos = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
-          PREC W = dws(0, i) * dws(1, j) * dws(2, k);
-          auto wm = pbuffer.mass * W;
-          atomicAdd(
-              &p2gbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm);
-          atomicAdd(
-              &p2gbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] +
-                             contrib[6] * pos[2]) *
-                                W);
-          atomicAdd(
-              &p2gbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * vel[1] + (contrib[1] * pos[0] + contrib[4] * pos[1] +
-                             contrib[7] * pos[2]) *
-                                W);
-          atomicAdd(
-              &p2gbuffer[3][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * vel[2] + (contrib[2] * pos[0] + contrib[5] * pos[1] +
-                             contrib[8] * pos[2]) *
-                                W);
-          atomicAdd(
-              &p2gbuffer[4][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * (vel[0] + Dp_inv * (C[0] * pos[0] + C[3] * pos[1] +
-                             C[6] * pos[2]))); //< mvi_n x ASFLIP
-          atomicAdd(
-              &p2gbuffer[5][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * (vel[1] + Dp_inv * (C[1] * pos[0] + C[4] * pos[1] +
-                             C[7] * pos[2]))); //< mvi_n y ASFLIP
-          atomicAdd(
-              &p2gbuffer[6][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * (vel[2] + Dp_inv * (C[2] * pos[0] + C[5] * pos[1] +
-                             C[8] * pos[2]))); //< mvi_n z ASFLIP
-        }
-  }
-  __syncthreads();
-  /// arena no, channel no, cell no
-  for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
-    char local_block_id = base / numMViPerBlock;
-    auto blockno = partition.query(
-        ivec3{blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0),
-              blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0),
-              blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-    // auto grid_block = next_grid.template ch<0>(blockno);
-    int channelid = base % numMViPerBlock;
-    char c = channelid % g_blockvolume;
-    char cz = channelid & g_blockmask;
-    char cy = (channelid >>= g_blockbits) & g_blockmask;
-    char cx = (channelid >>= g_blockbits) & g_blockmask;
-    channelid >>= g_blockbits;
-
-    float val =
-        p2gbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)]
-                 [cy + (local_block_id & 2 ? g_blocksize : 0)]
-                 [cz + (local_block_id & 1 ? g_blocksize : 0)];
-    if (channelid == 0)
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_0, c), val);
-    else if (channelid == 1)
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_1, c), val);
-    else if (channelid == 2)
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_2, c), val);
-    else if (channelid == 3)
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_3, c), val);
-    else if (channelid == 4)
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_4, c), val);
-    else if (channelid == 5)
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_5, c), val);
-    else if (channelid == 6)
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_6, c), val);
-  }
-}
-
 template <typename Partition, typename Grid>
 __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
                       const ParticleBuffer<material_e::NACC> pbuffer,
@@ -5681,7 +5331,7 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
     char z = loc & arenamask;
     char y = (loc >>= arenabits) & arenamask;
     char x = (loc >>= arenabits) & arenamask;
-    p2gbuffer[loc >> arenabits][x][y][z] = (PREC_G)0.f;
+    p2gbuffer[loc >> arenabits][x][y][z] = 0.f;
   }
   __syncthreads();
   for (int pidib = threadIdx.x; pidib < ppb; pidib += blockDim.x) {
@@ -5822,7 +5472,7 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
                       Grid grid, Grid next_grid) {
   static constexpr uint64_t numViPerBlock = g_blockvolume * 3;
   static constexpr uint64_t numViInArena = numViPerBlock << 3;
-  static constexpr uint64_t shmem_offset = (g_blockvolume * 3) << 3;
+  static constexpr uint64_t shmem_offset = (27 * 3) << 3;
 
   static constexpr uint64_t numMViPerBlock = g_blockvolume * 2;
   static constexpr uint64_t numMViInArena = numMViPerBlock << 3;
@@ -5832,14 +5482,14 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
 
   extern __shared__ char shmem[];
   using ViArena =
-      PREC_G(*)[3][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(*)[3][(g_blocksize << 1) - 2][(g_blocksize << 1) - 2][(g_blocksize << 1) - 2];
   using ViArenaRef =
-      PREC_G(&)[3][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(&)[3][(g_blocksize << 1) - 2][(g_blocksize << 1) - 2][(g_blocksize << 1) - 2];
   ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
   using MViArena =
-      PREC_G(*)[2][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(*)[2][(g_blocksize << 1) ][(g_blocksize << 1) ][(g_blocksize << 1) ];
   using MViArenaRef =
-      PREC_G(&)[2][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+      PREC_G(&)[2][(g_blocksize << 1) ][(g_blocksize << 1) ][(g_blocksize << 1) ];
   MViArenaRef __restrict__ p2gbuffer =
       *reinterpret_cast<MViArena>(shmem + shmem_offset * sizeof(PREC_G));
 
@@ -5876,15 +5526,19 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
     channelid >>= g_blockbits;
 
     PREC_G val;
-    if (channelid == 0) 
-      val = grid_block.val_1d(_1, c);
-    else if (channelid == 1)
-      val = grid_block.val_1d(_2, c);
-    else if (channelid == 2)
-      val = grid_block.val_1d(_3, c);
-    g2pbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)]
-             [cy + (local_block_id & 2 ? g_blocksize : 0)]
-             [cz + (local_block_id & 1 ? g_blocksize : 0)] = val;
+    if (cz + (local_block_id & 1 ? g_blocksize : 0) > 0 && cz + (local_block_id & 1 ? g_blocksize : 0) < arenamask) {
+      if (cy + (local_block_id & 2 ? g_blocksize : 0) > 0 && cy + (local_block_id & 2 ? g_blocksize : 0) < arenamask) {
+        if (cx + (local_block_id & 4 ? g_blocksize : 0) > 0 && cx + (local_block_id & 4 ? g_blocksize : 0) < arenamask) {
+          if (channelid == 0) 
+            val = grid_block.val_1d(_1, c);
+          else if (channelid == 1)
+            val = grid_block.val_1d(_2, c);
+          else if (channelid == 2)
+            val = grid_block.val_1d(_3, c);
+          g2pbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0) - 1][cy + (local_block_id & 2 ? g_blocksize : 0) - 1][cz + (local_block_id & 1 ? g_blocksize : 0) - 1] = val;
+        }
+      }
+    }
   }
   __syncthreads();
   for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
@@ -5892,7 +5546,9 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
     char z = loc & arenamask;
     char y = (loc >>= arenabits) & arenamask;
     char x = (loc >>= arenabits) & arenamask;
-    p2gbuffer[loc >> arenabits][x][y][z] = (PREC_G)0.0;
+    // if (x > 0 && x < arenamask && y > 0 && y < arenamask && z > 0 && z < arenamask) {
+    p2gbuffer[loc >> arenabits][x][y][z] = 0.f;
+    // }
   }
   __syncthreads();
   for (int pidib = threadIdx.x; pidib < ppb; pidib += blockDim.x) {
@@ -5954,24 +5610,31 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       for (char j = 0; j < 3; j++)
 #pragma unroll 3
         for (char k = 0; k < 3; k++) {
-          pvec3 xixp = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
-          PREC W = dws(0, i) * dws(1, j) * dws(2, k);
-          pvec3 vi{g2pbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k]};
-          vel += vi * W;
-          C[0] += W * vi[0] * xixp[0] * scale;
-          C[1] += W * vi[1] * xixp[0] * scale;
-          C[2] += W * vi[2] * xixp[0] * scale;
-          C[3] += W * vi[0] * xixp[1] * scale;
-          C[4] += W * vi[1] * xixp[1] * scale;
-          C[5] += W * vi[2] * xixp[1] * scale;
-          C[6] += W * vi[0] * xixp[2] * scale;
-          C[7] += W * vi[1] * xixp[2] * scale;
-          C[8] += W * vi[2] * xixp[2] * scale;
+          if (local_base_index[0] + i > 0 && local_base_index[0] + i < arenamask) {
+          if (local_base_index[1] + j > 0 && local_base_index[1] + j < arenamask) {
+          if (local_base_index[2] + k > 0 && local_base_index[2] + k < arenamask) {
+            pvec3 xixp = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
+            PREC W = dws(0, i) * dws(1, j) * dws(2, k);
+
+            pvec3 vi{g2pbuffer[0][local_base_index[0] + i - 1][local_base_index[1] + j - 1]
+                            [local_base_index[2] + k - 1],
+                    g2pbuffer[1][local_base_index[0] + i - 1][local_base_index[1] + j - 1]
+                            [local_base_index[2] + k - 1],
+                    g2pbuffer[2][local_base_index[0] + i - 1][local_base_index[1] + j - 1]
+                            [local_base_index[2] + k - 1]};
+            vel += vi * W;
+            C[0] += W * vi[0] * xixp[0] * scale;
+            C[1] += W * vi[1] * xixp[0] * scale;
+            C[2] += W * vi[2] * xixp[0] * scale;
+            C[3] += W * vi[0] * xixp[1] * scale;
+            C[4] += W * vi[1] * xixp[1] * scale;
+            C[5] += W * vi[2] * xixp[1] * scale;
+            C[6] += W * vi[0] * xixp[2] * scale;
+            C[7] += W * vi[1] * xixp[2] * scale;
+            C[8] += W * vi[2] * xixp[2] * scale;
+          }
+          }
+          }
         }
     PREC JInc = ((C[0] + C[4] + C[8]) * dt * Dp_inv); // J^n+1 / J^n
     PREC voln = (1.0 - sJ) * pbuffer.volume; // vol^n+1, Send to grid for Simple FBar 
@@ -6031,7 +5694,9 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       for (char j = 0; j < 3; j++)
 #pragma unroll 3
         for (char k = 0; k < 3; k++) {
-          //pos = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
+          // if (local_base_index[0] + i > 0 && local_base_index[0] + i < arenamask) {
+          //   if (local_base_index[1] + j > 0 && local_base_index[1] + j < arenamask) {
+          //     if (local_base_index[2] + k > 0 && local_base_index[2] + k < arenamask) {
           PREC W = dws(0, i) * dws(1, j) * dws(2, k);
           PREC wv = voln * W; // Weighted volume
           atomicAdd(
@@ -6042,6 +5707,9 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
               &p2gbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
               wv * (sJBar + sJBar * JInc - JInc));
+          //     }
+          //   }
+          // }
         }
   }
   __syncthreads();
@@ -6059,15 +5727,18 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
     char cy = (channelid >>= g_blockbits) & g_blockmask;
     char cx = (channelid >>= g_blockbits) & g_blockmask;
     channelid >>= g_blockbits;
-    PREC_G val =
-        p2gbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)]
-                [cy + (local_block_id & 2 ? g_blocksize : 0)]
-                [cz + (local_block_id & 1 ? g_blocksize : 0)];
+    // if (cz > 0 && cz < arenamask) {      
+    //   if (cy > 0 && cy < arenamask) {
+    //     if (cx > 0 && cx < arenamask) {
+    PREC_G val = p2gbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)][cy + (local_block_id & 2 ? g_blocksize : 0)][cz + (local_block_id & 1 ? g_blocksize : 0)];
     if (channelid == 0) {
       atomicAdd(&grid.ch(_0, blockno).val_1d(_7, c), val); //< Vol
     } else if (channelid == 1) {
-      atomicAdd(&grid.ch(_0, blockno).val_1d(_8, c), val); //< JBar_Jinc Vol
-    } 
+      atomicAdd(&grid.ch(_0, blockno).val_1d(_8, c), val); //< JBar_JInc Vol
+    }
+    //     }
+    //   }
+    // } 
   }
 }
 
@@ -6773,12 +6444,10 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
   }
 }
 
-
-
 template <typename Partition, typename Grid>
 __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks,
-                      const ParticleBuffer<material_e::CoupledUP> pbuffer,
-                      ParticleBuffer<material_e::CoupledUP> next_pbuffer,
+                      const ParticleBuffer<material_e::NACC> pbuffer,
+                      ParticleBuffer<material_e::NACC> next_pbuffer,
                       const Partition prev_partition, Partition partition,
                       Grid grid, Grid next_grid) {
   static constexpr uint64_t numViPerBlock = g_blockvolume * 3;
@@ -6996,10 +6665,11 @@ __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
   }
 }
 
+
 template <typename Partition, typename Grid>
 __global__ void g2p_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks,
-                      const ParticleBuffer<material_e::NACC> pbuffer,
-                      ParticleBuffer<material_e::NACC> next_pbuffer,
+                      const ParticleBuffer<material_e::CoupledUP> pbuffer,
+                      ParticleBuffer<material_e::CoupledUP> next_pbuffer,
                       const Partition prev_partition, Partition partition,
                       Grid grid, Grid next_grid) {
   static constexpr uint64_t numViPerBlock = g_blockvolume * 3;
@@ -7622,21 +7292,18 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
 
   ivec3 blockid;
   int src_blockno;
-  int ppb; 
   if (blocks != nullptr) { 
     blockid = blocks[blockIdx.x]; // Halo block ID
     src_blockno = partition.query(blockid); // Halo block number
-    ppb = g_buckets_on_particle_buffer
-            ? next_pbuffer._ppbs[src_blockno] 
-            : partition._ppbs[src_blockno]; // Particles in block
   } else { 
     if (partition._haloMarks[blockIdx.x]) return; // Return early if halo block
     src_blockno = blockIdx.x; // Non-halo block number
-    ppb = g_buckets_on_particle_buffer
-            ? next_pbuffer._ppbs[src_blockno] 
-            : partition._ppbs[src_blockno]; // Particles in block
     blockid = partition._activeKeys[blockIdx.x]; // Non-halo block ID
   }
+
+  int ppb = g_buckets_on_particle_buffer
+          ? next_pbuffer._ppbs[src_blockno] 
+          : partition._ppbs[src_blockno]; // Particles in block
   if (ppb == 0) return; // Return early if no particles
   // if (src_blockno < 0) return; // Return early if negative block number
   //  else if (src_blockno > blockcnt) return; // Return early if excessive block number
@@ -7681,7 +7348,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
     char z = loc & arenamask;
     char y = (loc >>= arenabits) & arenamask;
     char x = (loc >>= arenabits) & arenamask;
-    p2gbuffer[loc >> arenabits][x][y][z] = (PREC_G)0.f;
+    p2gbuffer[loc >> arenabits][x][y][z] = 0.f;
   }
   __syncthreads();
   // Start Grid-to-Particle, threads are particle
@@ -9047,7 +8714,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
                       const ParticleBuffer<material_e::Sand> pbuffer,
                       ParticleBuffer<material_e::Sand> next_pbuffer,
                       const Partition prev_partition, Partition partition,
-                      const Grid grid, Grid next_grid) {
+                      const Grid grid, Grid next_grid) { 
   static constexpr uint64_t numViPerBlock = g_blockvolume * 8;
   static constexpr uint64_t numViInArena = numViPerBlock << 3;
   static constexpr uint64_t shmem_offset = (g_blockvolume * 8) << 3;
@@ -9415,435 +9082,6 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
   }
 }
 
-
-
-template <typename Partition, typename Grid>
-__global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks,
-                      const ParticleBuffer<material_e::CoupledUP> pbuffer,
-                      ParticleBuffer<material_e::CoupledUP> next_pbuffer,
-                      const Partition prev_partition, Partition partition,
-                      const Grid grid, Grid next_grid) {
-  static constexpr uint64_t numViPerBlock = g_blockvolume * 8;
-  static constexpr uint64_t numViInArena = numViPerBlock << 3;
-  static constexpr uint64_t shmem_offset = (g_blockvolume * 8) << 3;
-
-  static constexpr uint64_t numMViPerBlock = g_blockvolume * 7;
-  static constexpr uint64_t numMViInArena = numMViPerBlock << 3;
-
-  static constexpr unsigned arenamask = (g_blocksize << 1) - 1;
-  static constexpr unsigned arenabits = g_blockbits + 1;
-
-  extern __shared__ char shmem[];
-  using ViArena =
-      PREC_G(*)[10][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  using ViArenaRef =
-      PREC_G(&)[10][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
-  using MViArena =
-      PREC_G(*)[9][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  using MViArenaRef =
-      PREC_G(&)[9][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  MViArenaRef __restrict__ p2gbuffer =
-      *reinterpret_cast<MViArena>(shmem + shmem_offset * sizeof(PREC_G));
-  // using ViArena =
-  //     PREC_G(*)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  // using ViArenaRef =
-  //     PREC_G(&)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  // ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
-  // using MViArena =
-  //     PREC_G(*)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  // using MViArenaRef =
-  //     PREC_G(&)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
-  // MViArenaRef __restrict__ p2gbuffer =
-  //     *reinterpret_cast<MViArena>(shmem + shmem_offset * sizeof(PREC_G));
-
-  ivec3 blockid;
-  int src_blockno;
-  if (blocks != nullptr) { 
-    blockid = blocks[blockIdx.x]; // Halo block ID
-    src_blockno = partition.query(blockid); // Halo block number
-  } else { 
-    if (partition._haloMarks[blockIdx.x]) return; // Return early if halo block
-    blockid = partition._activeKeys[blockIdx.x]; // Non-halo block ID
-    src_blockno = blockIdx.x; // Non-halo block number
-  }
-  if (src_blockno < 0) return; // Return early if negative block number
-//  else if (src_blockno > blockcnt) return; // Return early if excessive block number
-  int ppb = g_buckets_on_particle_buffer
-            ? next_pbuffer._ppbs[src_blockno] 
-            : partition._ppbs[src_blockno]; // Particles in block
-  if (ppb == 0) return; // Return early if no particles
-
-
-
-
-
-  for (int base = threadIdx.x; base < numViInArena; base += blockDim.x) {
-    char local_block_id = base / numViPerBlock;
-    auto blockno = partition.query(
-        ivec3{blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0),
-              blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0),
-              blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-    auto grid_block = grid.ch(_0, blockno);
-    int channelid = base % numViPerBlock;
-    char c = channelid & 0x3f;
-    char cz = channelid & g_blockmask;
-    char cy = (channelid >>= g_blockbits) & g_blockmask;
-    char cx = (channelid >>= g_blockbits) & g_blockmask;
-    channelid >>= g_blockbits;
-
-    PREC_G val;
-    if (channelid == 0) 
-      val = grid_block.val_1d(_1, c); // vel(1) + dt*fint(1)
-    else if (channelid == 1)
-      val = grid_block.val_1d(_2, c);
-    else if (channelid == 2)
-      val = grid_block.val_1d(_3, c);
-    else if (channelid == 3) 
-      val = grid_block.val_1d(_4, c); // vel(1)
-    else if (channelid == 4) 
-      val = grid_block.val_1d(_5, c);
-    else if (channelid == 5) 
-      val = grid_block.val_1d(_6, c);
-    else if (channelid == 6) 
-      val = grid_block.val_1d(_7, c); // Vol
-    else if (channelid == 7) 
-      val = grid_block.val_1d(_8, c); // J
-    else if (channelid == 8) 
-      val = grid_block.val_1d(_10, c); // pw
-    g2pbuffer[channelid]
-             [cx + (local_block_id & 4 ? g_blocksize : 0)]
-             [cy + (local_block_id & 2 ? g_blocksize : 0)]
-             [cz + (local_block_id & 1 ? g_blocksize : 0)] = val;
-  }
-  __syncthreads();
-  for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
-    int loc = base;
-    char z = loc & arenamask;
-    char y = (loc >>= arenabits) & arenamask;
-    char x = (loc >>= arenabits) & arenamask;
-    p2gbuffer[loc >> arenabits][x][y][z] = (PREC_G)0.0;
-  }
-  __syncthreads();
-  // Start Grid-to-Particle, threads are particle
-  for (int pidib = threadIdx.x; pidib < ppb; pidib += blockDim.x) {
-    int source_blockno, source_pidib;
-    ivec3 base_index;
-    {
-      int advect = (g_buckets_on_particle_buffer)
-                    ? next_pbuffer._blockbuckets[src_blockno * g_particle_num_per_block + pidib]
-                    : partition._blockbuckets[src_blockno * g_particle_num_per_block + pidib];
-      dir_components(advect / g_particle_num_per_block, base_index);
-      base_index += blockid;
-      source_blockno = prev_partition.query(base_index);
-      source_pidib = advect % g_particle_num_per_block; // & (g_particle_num_per_block - 1);
-      source_blockno = (g_buckets_on_particle_buffer)
-                        ? pbuffer._binsts[source_blockno] + source_pidib / g_bin_capacity
-                        : prev_partition._binsts[source_blockno] + source_pidib / g_bin_capacity;
-    }
-    pvec3 pos;  //< Particle position at n
-    {
-      auto source_particle_bin = pbuffer.ch(_0, source_blockno);
-      pos[0] = source_particle_bin.val(_0, source_pidib % g_bin_capacity);  //< x
-      pos[1] = source_particle_bin.val(_1, source_pidib % g_bin_capacity);  //< y
-      pos[2] = source_particle_bin.val(_2, source_pidib % g_bin_capacity);  //< z
-    }
-    ivec3 local_base_index = (pos * g_dx_inv + 0.5f).cast<int>() - 1;
-    pvec3 local_pos = pos - local_base_index * g_dx;
-    base_index = local_base_index;
-
-    pvec3x3 dws;
-#pragma unroll 3
-    for (int dd = 0; dd < 3; ++dd) {
-      PREC d =
-          (local_pos[dd] - ((int)(local_pos[dd] * g_dx_inv + 0.5f) - 1) * g_dx) *
-          g_dx_inv;
-      dws(dd, 0) = 0.5 * (1.5 - d) * (1.5 - d);
-      d -= 1.0;
-      dws(dd, 1) = 0.75 - d * d;
-      d = 0.5 + d;
-      dws(dd, 2) = 0.5 * d * d;
-      local_base_index[dd] = ((local_base_index[dd] - 1) & g_blockmask) + 1;
-    }
-    pvec3 vel;   //< Stressed, collided grid velocity
-    pvec3 vel_FLIP; //< Unstressed, uncollided grid velocity
-    pvec9 C;     //< APIC affine matrix, used a few times
-    vel.set(0.0); 
-    vel_FLIP.set(0.0);
-    C.set(0.0);
-    PREC sJBar_new; //< Simple FBar G2P JBar^n+1
-    sJBar_new = 0.0;
-
-    // Dp^n = Dp^n+1 = (1/4) * dx^2 * I (Quad.)
-    PREC Dp_inv; //< Inverse Intertia-Like Tensor (1/m^2)
-    PREC scale;
-    scale = pbuffer.length * pbuffer.length; //< Area scale (m^2)
-    Dp_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
-
-#pragma unroll 3
-    for (char i = 0; i < 3; i++)
-#pragma unroll 3
-      for (char j = 0; j < 3; j++)
-#pragma unroll 3
-        for (char k = 0; k < 3; k++) {
-          pvec3 xixp = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
-          PREC W = dws(0, i) * dws(1, j) * dws(2, k);
-          pvec3 vi{g2pbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k],
-                  g2pbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
-                           [local_base_index[2] + k]};
-          pvec3 vi_n{g2pbuffer[3][local_base_index[0] + i][local_base_index[1] + j]
-                            [local_base_index[2] + k],
-                    g2pbuffer[4][local_base_index[0] + i][local_base_index[1] + j]
-                            [local_base_index[2] + k],
-                    g2pbuffer[5][local_base_index[0] + i][local_base_index[1] + j]
-                            [local_base_index[2] + k]};
-
-          PREC sJBar_i = g2pbuffer[7][local_base_index[0] + i][local_base_index[1] + j]
-                            [local_base_index[2] + k] / g2pbuffer[6][local_base_index[0] + i][local_base_index[1] + j]
-                            [local_base_index[2] + k];
-
-          PREC pw = g2pbuffer[8][local_base_index[0] + i][local_base_index[1] + j]
-                            [local_base_index[2] + k];
-          vel   += vi * W;
-          vel_FLIP += vi_n * W; 
-          C[0] += W * vi[0] * xixp[0] * scale;
-          C[1] += W * vi[1] * xixp[0] * scale;
-          C[2] += W * vi[2] * xixp[0] * scale;
-          C[3] += W * vi[0] * xixp[1] * scale;
-          C[4] += W * vi[1] * xixp[1] * scale;
-          C[5] += W * vi[2] * xixp[1] * scale;
-          C[6] += W * vi[0] * xixp[2] * scale;
-          C[7] += W * vi[1] * xixp[2] * scale;
-          C[8] += W * vi[2] * xixp[2] * scale;
-          sJBar_new += sJBar_i * W;
-        }
-
-#pragma unroll 9
-    for (int d = 0; d < 9; ++d)
-      dws.val(d) = C[d] * dt * Dp_inv + ((d & 0x3) ? 0.0 : 1.0);
-    pvec9 contrib;
-    {
-      pvec9 F;
-      PREC logJp;
-      pvec3 vel_p; //< Particle vel. at n
-      PREC sJBar;
-      PREC ID;
-      PREC pw;
-      // pw = 0.0;
-      auto source_particle_bin = pbuffer.ch(_0, source_blockno);
-      contrib[0] = source_particle_bin.val(_3, source_pidib % g_bin_capacity);
-      contrib[1] = source_particle_bin.val(_4, source_pidib % g_bin_capacity);
-      contrib[2] = source_particle_bin.val(_5, source_pidib % g_bin_capacity);
-      contrib[3] = source_particle_bin.val(_6, source_pidib % g_bin_capacity);
-      contrib[4] = source_particle_bin.val(_7, source_pidib % g_bin_capacity);
-      contrib[5] = source_particle_bin.val(_8, source_pidib % g_bin_capacity);
-      contrib[6] = source_particle_bin.val(_9, source_pidib % g_bin_capacity);
-      contrib[7] = source_particle_bin.val(_10, source_pidib % g_bin_capacity);
-      contrib[8] = source_particle_bin.val(_11, source_pidib % g_bin_capacity);
-      logJp  = source_particle_bin.val(_12, source_pidib % g_bin_capacity); //< Volume tn
-      vel_p[0] = source_particle_bin.val(_13, source_pidib % g_bin_capacity); //< vx
-      vel_p[1] = source_particle_bin.val(_14, source_pidib % g_bin_capacity); //< vy
-      vel_p[2] = source_particle_bin.val(_15, source_pidib % g_bin_capacity); //< vz
-      sJBar = source_particle_bin.val(_16, source_pidib % g_bin_capacity); //< JBar tn
-      pw =  source_particle_bin.val(_17, source_pidib % g_bin_capacity); // water pore pressure
-      ID =  source_particle_bin.val(_18, source_pidib % g_bin_capacity);
-
-      matrixMatrixMultiplication3d(dws.data(), contrib.data(), F.data());
-      
-      PREC JInc = matrixDeterminant3d(dws.data());
-      PREC J  = matrixDeterminant3d(F.data());
-      // PREC voln = J * pbuffer.volume;
-
-      PREC beta; //< Position correction factor (ASFLIP)
-      if ((1.0 - sJBar_new) >= 1.0) beta = pbuffer.beta_max;  // beta max
-      else beta = pbuffer.beta_min; // beta min
-
-      // * Advect particle position and velocity
-      pos += dt * (vel + beta * pbuffer.alpha * (vel_p - vel_FLIP)); //< pos update
-      vel += pbuffer.alpha * (vel_p - vel_FLIP); //< vel update
-      
-      // FBar_n+1 = (JBar_n+1 / J_n+1)^(1/3) * F_n+1
-      PREC J_Scale = cbrt((1.0 - sJBar_new) / J);
-      // May need to redefine FBAR for Sand. DefGrad. F is altered
-      // In compute_stress_sand before saving to particle buffer + FBAR scaling
-      PREC FBAR_ratio = pbuffer.FBAR_ratio;
-#pragma unroll 9
-      for (int d = 0; d < 9; d++) F[d] = F[d] * ((1.0 - FBAR_ratio) * 1.0 + (FBAR_ratio) * J_Scale);
-      compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda, pbuffer.cohesion,
-      pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, pw, F, contrib);
-      {
-        auto particle_bin = g_buckets_on_particle_buffer 
-            ? next_pbuffer.ch(_0, next_pbuffer._binsts[src_blockno] + pidib / g_bin_capacity) 
-            : next_pbuffer.ch(_0, partition._binsts[src_blockno] + pidib / g_bin_capacity);
-        particle_bin.val(_0, pidib % g_bin_capacity) = pos[0];
-        particle_bin.val(_1, pidib % g_bin_capacity) = pos[1];
-        particle_bin.val(_2, pidib % g_bin_capacity) = pos[2];
-        particle_bin.val(_3, pidib % g_bin_capacity) = F[0] ;
-        particle_bin.val(_4, pidib % g_bin_capacity) = F[1] ;
-        particle_bin.val(_5, pidib % g_bin_capacity) = F[2] ;
-        particle_bin.val(_6, pidib % g_bin_capacity) = F[3] ;
-        particle_bin.val(_7, pidib % g_bin_capacity) = F[4] ;
-        particle_bin.val(_8, pidib % g_bin_capacity) = F[5] ;
-        particle_bin.val(_9, pidib % g_bin_capacity) = F[6] ;
-        particle_bin.val(_10, pidib % g_bin_capacity) = F[7];
-        particle_bin.val(_11, pidib % g_bin_capacity) = F[8];
-        particle_bin.val(_12, pidib % g_bin_capacity) = logJp;
-        particle_bin.val(_13, pidib % g_bin_capacity) = vel[0];
-        particle_bin.val(_14, pidib % g_bin_capacity) = vel[1];
-        particle_bin.val(_15, pidib % g_bin_capacity) = vel[2];
-        particle_bin.val(_16, pidib % g_bin_capacity) = sJBar_new;
-        particle_bin.val(_17, pidib % g_bin_capacity) = pw;
-        particle_bin.val(_18, pidib % g_bin_capacity) = ID;
-      }
-
-      {
-      contrib = (C * pbuffer.mass - contrib * newDt) * Dp_inv;
-      }
-    }
-
-    local_base_index = (pos * g_dx_inv + 0.5f).cast<int>() - 1;
-    {
-      int direction_tag = dir_offset((base_index - 1) / g_blocksize -
-                              (local_base_index - 1) / g_blocksize);
-      if (g_buckets_on_particle_buffer)
-        next_pbuffer.add_advection(partition, local_base_index - 1, direction_tag, pidib);
-      else 
-        partition.add_advection(local_base_index - 1, direction_tag, pidib);
-    }
-
-#pragma unroll 3
-    for (char dd = 0; dd < 3; ++dd) {
-      local_pos[dd] = pos[dd] - local_base_index[dd] * g_dx;
-      PREC d =
-          (local_pos[dd] - ((int)(local_pos[dd] * g_dx_inv + 0.5) - 1) * g_dx) *
-          g_dx_inv;
-      dws(dd, 0) = 0.5 * (1.5 - d) * (1.5 - d);
-      d -= 1.0;
-      dws(dd, 1) = 0.75 - d * d;
-      d = 0.5 + d;
-      dws(dd, 2) = 0.5 * d * d;
-
-      local_base_index[dd] = (((base_index[dd] - 1) & g_blockmask) + 1) +
-                             local_base_index[dd] - base_index[dd];
-    }
- 
-    scale = pbuffer.length * pbuffer.length; //< Area scale (m^2) 
-    PREC M_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
-      PREC pw;
-#pragma unroll 3
-    for (char i = 0; i < 3; i++)
-#pragma unroll 3
-      for (char j = 0; j < 3; j++)
-#pragma unroll 3
-        for (char k = 0; k < 3; k++) {
-          pos = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
-          PREC W = dws(0, i) * dws(1, j) * dws(2, k);
-          PREC wm = pbuffer.mass * W;
-          PREC wmw = pbuffer.masw * W;
-          PREC newDtKm = newDt * pbuffer.Kperm * pbuffer.masw;
-          atomicAdd(
-              &p2gbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm); 
-
-          // Velocity*mass         
-          atomicAdd(
-              &p2gbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] +
-                             contrib[6] * pos[2]) * W);   
-          atomicAdd(
-              &p2gbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * vel[1] + (contrib[1] * pos[0] + contrib[4] * pos[1] +
-                             contrib[7] * pos[2]) * W);
-          atomicAdd(
-              &p2gbuffer[3][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * vel[2] + (contrib[2] * pos[0] + contrib[5] * pos[1] +
-                             contrib[8] * pos[2]) * W);
-
-          // ASFLIP unstressed velocity
-          atomicAdd(
-              &p2gbuffer[4][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * (vel[0] + Dp_inv * (C[0] * pos[0] + C[3] * pos[1] + C[6] * pos[2])));
-          atomicAdd(
-              &p2gbuffer[5][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * (vel[1] + Dp_inv * (C[1] * pos[0] + C[4] * pos[1] + C[7] * pos[2])));
-          atomicAdd(
-              &p2gbuffer[6][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wm * (vel[2] + Dp_inv * (C[2] * pos[0] + C[5] * pos[1] + C[8] * pos[2])));
-
-
-          atomicAdd(
-              &p2gbuffer[9][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wmw);
-          
-          
-          atomicAdd(
-              &p2gbuffer[10][local_base_index[0] + i][local_base_index[1] + j]
-                        [local_base_index[2] + k],
-              wmw * pbuffer.Q_inv * pw 
-              - (newDtKm * pow(M_inv*W,2) * (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]))*pw 
-              - newDt * pbuffer.alpha1 * M_inv * W * wmw * (pos[0] * vel[0] + pos[1] * vel[1] + pos[2] * vel[2]) );
-
-        }
-  }
-  __syncthreads();
-
-
-
-
-
-
-
-
-  /// arena no, channel no, cell no
-  for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
-    char local_block_id = base / numMViPerBlock;
-    auto blockno = partition.query(
-        ivec3{blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0),
-              blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0),
-              blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
-    int channelid = base % numMViPerBlock; //& (numMViPerBlock - 1);
-    char c = channelid % g_blockvolume;
-    char cz = channelid & g_blockmask;
-    char cy = (channelid >>= g_blockbits) & g_blockmask;
-    char cx = (channelid >>= g_blockbits) & g_blockmask;
-    channelid >>= g_blockbits;
-    PREC_G val =
-        p2gbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)]
-                 [cy + (local_block_id & 2 ? g_blocksize : 0)]
-                 [cz + (local_block_id & 1 ? g_blocksize : 0)];
-    if (channelid == 0) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_0, c), val);
-    } else if (channelid == 1) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_1, c), val);
-    } else if (channelid == 2) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_2, c), val);
-    } else if (channelid == 3) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_3, c), val);
-    } else if (channelid == 4) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_4, c), val);
-    } else if (channelid == 5) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_5, c), val);
-    } else if (channelid == 6) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_6, c), val);
-    } else if (channelid == 9) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_9, c), val);
-    } else if (channelid == 10) {
-      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_10, c), val);
-    }
-  }
-}
-
 template <typename Partition, typename Grid>
 __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks,
                       const ParticleBuffer<material_e::NACC> pbuffer,
@@ -10207,6 +9445,441 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       atomicAdd(&next_grid.ch(_0, blockno).val_1d(_5, c), val);
     } else if (channelid == 6) {
       atomicAdd(&next_grid.ch(_0, blockno).val_1d(_6, c), val);
+    }
+  }
+}
+
+
+template <typename Partition, typename Grid>
+__global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks,
+                      const ParticleBuffer<material_e::CoupledUP> pbuffer,
+                      ParticleBuffer<material_e::CoupledUP> next_pbuffer,
+                      const Partition prev_partition, Partition partition,
+                      const Grid grid, Grid next_grid) {
+  static constexpr uint64_t numViPerBlock = g_blockvolume * 10;
+  static constexpr uint64_t numViInArena = numViPerBlock << 3;
+  static constexpr uint64_t shmem_offset = (g_blockvolume * 10) << 3;
+
+  static constexpr uint64_t numMViPerBlock = g_blockvolume * 9;
+  static constexpr uint64_t numMViInArena = numMViPerBlock << 3;
+
+  static constexpr unsigned arenamask = (g_blocksize << 1) - 1;
+  static constexpr unsigned arenabits = g_blockbits + 1;
+
+  extern __shared__ char shmem[];
+  using ViArena =
+      PREC_G(*)[10][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  using ViArenaRef =
+      PREC_G(&)[10][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
+  using MViArena =
+      PREC_G(*)[9][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  using MViArenaRef =
+      PREC_G(&)[9][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  MViArenaRef __restrict__ p2gbuffer =
+      *reinterpret_cast<MViArena>(shmem + shmem_offset * sizeof(PREC_G));
+  // using ViArena =
+  //     PREC_G(*)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // using ViArenaRef =
+  //     PREC_G(&)[8][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // ViArenaRef __restrict__ g2pbuffer = *reinterpret_cast<ViArena>(shmem);
+  // using MViArena =
+  //     PREC_G(*)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // using MViArenaRef =
+  //     PREC_G(&)[7][g_blocksize << 1][g_blocksize << 1][g_blocksize << 1];
+  // MViArenaRef __restrict__ p2gbuffer =
+  //     *reinterpret_cast<MViArena>(shmem + shmem_offset * sizeof(PREC_G));
+
+  ivec3 blockid;
+  int src_blockno;
+  if (blocks != nullptr) { 
+    blockid = blocks[blockIdx.x]; // Halo block ID
+    src_blockno = partition.query(blockid); // Halo block number
+  } else { 
+    if (partition._haloMarks[blockIdx.x]) return; // Return early if halo block
+    blockid = partition._activeKeys[blockIdx.x]; // Non-halo block ID
+    src_blockno = blockIdx.x; // Non-halo block number
+  }
+  if (src_blockno < 0) return; // Return early if negative block number
+//  else if (src_blockno > blockcnt) return; // Return early if excessive block number
+  int ppb = g_buckets_on_particle_buffer
+            ? next_pbuffer._ppbs[src_blockno] 
+            : partition._ppbs[src_blockno]; // Particles in block
+  if (ppb == 0) return; // Return early if no particles
+
+  for (int base = threadIdx.x; base < numViInArena; base += blockDim.x) {
+    char local_block_id = base / numViPerBlock;
+    auto blockno = partition.query(
+        ivec3{blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0),
+              blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0),
+              blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
+    auto grid_block = grid.ch(_0, blockno);
+    int channelid = base % numViPerBlock;
+    char c = channelid & 0x3f;
+    char cz = channelid & g_blockmask;
+    char cy = (channelid >>= g_blockbits) & g_blockmask;
+    char cx = (channelid >>= g_blockbits) & g_blockmask;
+    channelid >>= g_blockbits;
+
+    PREC_G val;
+    if (channelid == 0) 
+      val = grid_block.val_1d(_1, c); // vel(1) + dt*fint(1)
+    else if (channelid == 1)
+      val = grid_block.val_1d(_2, c);
+    else if (channelid == 2)
+      val = grid_block.val_1d(_3, c);
+    else if (channelid == 3) 
+      val = grid_block.val_1d(_4, c); // vel(1)
+    else if (channelid == 4) 
+      val = grid_block.val_1d(_5, c);
+    else if (channelid == 5) 
+      val = grid_block.val_1d(_6, c);
+    else if (channelid == 6) 
+      val = grid_block.val_1d(_7, c); // Vol
+    else if (channelid == 7) 
+      val = grid_block.val_1d(_8, c); // J
+    else if (channelid == 8) 
+      val = grid_block.val_1d(_9, c); // mass_w
+    else if (channelid == 9) 
+      val = grid_block.val_1d(_10, c); // pressure_w
+    g2pbuffer[channelid]
+             [cx + (local_block_id & 4 ? g_blocksize : 0)]
+             [cy + (local_block_id & 2 ? g_blocksize : 0)]
+             [cz + (local_block_id & 1 ? g_blocksize : 0)] = val;
+  }
+  __syncthreads();
+  for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
+    int loc = base;
+    char z = loc & arenamask;
+    char y = (loc >>= arenabits) & arenamask;
+    char x = (loc >>= arenabits) & arenamask;
+    p2gbuffer[loc >> arenabits][x][y][z] = (PREC_G)0.0;
+  }
+  __syncthreads();
+  // Start Grid-to-Particle, threads are particle
+  for (int pidib = threadIdx.x; pidib < ppb; pidib += blockDim.x) {
+    int source_blockno, source_pidib;
+    ivec3 base_index;
+    {
+      int advect = (g_buckets_on_particle_buffer)
+                    ? next_pbuffer._blockbuckets[src_blockno * g_particle_num_per_block + pidib]
+                    : partition._blockbuckets[src_blockno * g_particle_num_per_block + pidib];
+      dir_components(advect / g_particle_num_per_block, base_index);
+      base_index += blockid;
+      source_blockno = prev_partition.query(base_index);
+      source_pidib = advect % g_particle_num_per_block; // & (g_particle_num_per_block - 1);
+      source_blockno = (g_buckets_on_particle_buffer)
+                        ? pbuffer._binsts[source_blockno] + source_pidib / g_bin_capacity
+                        : prev_partition._binsts[source_blockno] + source_pidib / g_bin_capacity;
+    }
+    pvec3 pos;  //< Particle position at n
+    {
+      auto source_particle_bin = pbuffer.ch(_0, source_blockno);
+      pos[0] = source_particle_bin.val(_0, source_pidib % g_bin_capacity);  //< x
+      pos[1] = source_particle_bin.val(_1, source_pidib % g_bin_capacity);  //< y
+      pos[2] = source_particle_bin.val(_2, source_pidib % g_bin_capacity);  //< z
+    }
+    ivec3 local_base_index = (pos * g_dx_inv + 0.5f).cast<int>() - 1;
+    pvec3 local_pos = pos - local_base_index * g_dx;
+    base_index = local_base_index;
+
+    pvec3x3 dws;
+#pragma unroll 3
+    for (int dd = 0; dd < 3; ++dd) {
+      PREC d =
+          (local_pos[dd] - ((int)(local_pos[dd] * g_dx_inv + 0.5f) - 1) * g_dx) *
+          g_dx_inv;
+      dws(dd, 0) = 0.5 * (1.5 - d) * (1.5 - d);
+      d -= 1.0;
+      dws(dd, 1) = 0.75 - d * d;
+      d = 0.5 + d;
+      dws(dd, 2) = 0.5 * d * d;
+      local_base_index[dd] = ((local_base_index[dd] - 1) & g_blockmask) + 1;
+    }
+    pvec3 vel;   //< Stressed, collided grid velocity
+    pvec3 vel_FLIP; //< Unstressed, uncollided grid velocity
+    pvec9 C;     //< APIC affine matrix, used a few times
+    vel.set(0.0); 
+    vel_FLIP.set(0.0);
+    C.set(0.0);
+    PREC sJBar_new; //< Simple FBar G2P JBar^n+1
+    sJBar_new = 0.0;
+
+    PREC pw_new; //< CoupledUP G2P water pressure^n+1
+    pw_new = 0.0;
+
+    // Dp^n = Dp^n+1 = (1/4) * dx^2 * I (Quad.)
+    PREC Dp_inv; //< Inverse Intertia-Like Tensor (1/m^2)
+    PREC scale;
+    scale = pbuffer.length * pbuffer.length; //< Area scale (m^2)
+    Dp_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
+
+
+
+#pragma unroll 3
+    for (char i = 0; i < 3; i++)
+#pragma unroll 3
+      for (char j = 0; j < 3; j++)
+#pragma unroll 3
+        for (char k = 0; k < 3; k++) {
+          pvec3 xixp = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
+          PREC W = dws(0, i) * dws(1, j) * dws(2, k);
+          pvec3 vi{g2pbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
+                           [local_base_index[2] + k],
+                  g2pbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
+                           [local_base_index[2] + k],
+                  g2pbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
+                           [local_base_index[2] + k]};
+          pvec3 vi_n{g2pbuffer[3][local_base_index[0] + i][local_base_index[1] + j]
+                            [local_base_index[2] + k],
+                    g2pbuffer[4][local_base_index[0] + i][local_base_index[1] + j]
+                            [local_base_index[2] + k],
+                    g2pbuffer[5][local_base_index[0] + i][local_base_index[1] + j]
+                            [local_base_index[2] + k]};
+
+          PREC sJBar_i = g2pbuffer[7][local_base_index[0] + i][local_base_index[1] + j]
+                            [local_base_index[2] + k] / g2pbuffer[6][local_base_index[0] + i][local_base_index[1] + j]
+                            [local_base_index[2] + k];
+
+          PREC pw_i = g2pbuffer[9][local_base_index[0] + i][local_base_index[1] + j]
+                            [local_base_index[2] + k] / g2pbuffer[8][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k];
+          vel   += vi * W;
+          vel_FLIP += vi_n * W; 
+          C[0] += W * vi[0] * xixp[0] * scale;
+          C[1] += W * vi[1] * xixp[0] * scale;
+          C[2] += W * vi[2] * xixp[0] * scale;
+          C[3] += W * vi[0] * xixp[1] * scale;
+          C[4] += W * vi[1] * xixp[1] * scale;
+          C[5] += W * vi[2] * xixp[1] * scale;
+          C[6] += W * vi[0] * xixp[2] * scale;
+          C[7] += W * vi[1] * xixp[2] * scale;
+          C[8] += W * vi[2] * xixp[2] * scale;
+          sJBar_new += sJBar_i * W;
+          pw_new += pw_i * W; //< CoupledUP G2P water pressure increment
+        }
+
+#pragma unroll 9
+    for (int d = 0; d < 9; ++d)
+      dws.val(d) = C[d] * dt * Dp_inv + ((d & 0x3) ? 0.0 : 1.0);
+    pvec9 contrib;
+    {
+      pvec9 F;
+      PREC logJp;
+      pvec3 vel_p; //< Particle vel. at n
+      PREC sJBar;
+      PREC ID;
+      // PREC masw;
+      PREC pw; // CoupledUP water pressure old
+
+      auto source_particle_bin = pbuffer.ch(_0, source_blockno);
+      contrib[0] = source_particle_bin.val(_3, source_pidib % g_bin_capacity);
+      contrib[1] = source_particle_bin.val(_4, source_pidib % g_bin_capacity);
+      contrib[2] = source_particle_bin.val(_5, source_pidib % g_bin_capacity);
+      contrib[3] = source_particle_bin.val(_6, source_pidib % g_bin_capacity);
+      contrib[4] = source_particle_bin.val(_7, source_pidib % g_bin_capacity);
+      contrib[5] = source_particle_bin.val(_8, source_pidib % g_bin_capacity);
+      contrib[6] = source_particle_bin.val(_9, source_pidib % g_bin_capacity);
+      contrib[7] = source_particle_bin.val(_10, source_pidib % g_bin_capacity);
+      contrib[8] = source_particle_bin.val(_11, source_pidib % g_bin_capacity);
+      logJp  = source_particle_bin.val(_12, source_pidib % g_bin_capacity); //< Volume tn
+      vel_p[0] = source_particle_bin.val(_13, source_pidib % g_bin_capacity); //< vx
+      vel_p[1] = source_particle_bin.val(_14, source_pidib % g_bin_capacity); //< vy
+      vel_p[2] = source_particle_bin.val(_15, source_pidib % g_bin_capacity); //< vz
+      sJBar = source_particle_bin.val(_16, source_pidib % g_bin_capacity); //< JBar tn
+      //masw =  source_particle_bin.val(_17, source_pidib % g_bin_capacity); // water mass old
+      pw =  source_particle_bin.val(_18, source_pidib % g_bin_capacity); // water pore pressure old
+      ID =  source_particle_bin.val(_19, source_pidib % g_bin_capacity);
+
+      matrixMatrixMultiplication3d(dws.data(), contrib.data(), F.data());
+      
+      PREC JInc = matrixDeterminant3d(dws.data());
+      PREC J  = matrixDeterminant3d(F.data());
+      // PREC voln = J * pbuffer.volume;
+
+      PREC beta; //< Position correction factor (ASFLIP)
+      if ((1.0 - sJBar_new) >= 1.0) beta = pbuffer.beta_max;  // beta max
+      else beta = pbuffer.beta_min; // beta min
+
+      // * Advect particle position and velocity
+      pos += dt * (vel + beta * pbuffer.alpha * (vel_p - vel_FLIP)); //< pos update
+      vel += pbuffer.alpha * (vel_p - vel_FLIP); //< vel update
+      
+      // FBar_n+1 = (JBar_n+1 / J_n+1)^(1/3) * F_n+1
+      PREC J_Scale = cbrt((1.0 - sJBar_new) / J);
+      // May need to redefine FBAR for Sand. DefGrad. F is altered
+      // In compute_stress_sand before saving to particle buffer + FBAR scaling
+      PREC FBAR_ratio = pbuffer.FBAR_ratio;
+#pragma unroll 9
+      for (int d = 0; d < 9; d++) F[d] = F[d] * ((1.0 - FBAR_ratio) * 1.0 + (FBAR_ratio) * J_Scale);
+      compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda, pbuffer.cohesion,
+      pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, pw_new, F, contrib);
+      {
+        auto particle_bin = g_buckets_on_particle_buffer 
+            ? next_pbuffer.ch(_0, next_pbuffer._binsts[src_blockno] + pidib / g_bin_capacity) 
+            : next_pbuffer.ch(_0, partition._binsts[src_blockno] + pidib / g_bin_capacity);
+        particle_bin.val(_0, pidib % g_bin_capacity) = pos[0];
+        particle_bin.val(_1, pidib % g_bin_capacity) = pos[1];
+        particle_bin.val(_2, pidib % g_bin_capacity) = pos[2];
+        particle_bin.val(_3, pidib % g_bin_capacity) = F[0] ;
+        particle_bin.val(_4, pidib % g_bin_capacity) = F[1] ;
+        particle_bin.val(_5, pidib % g_bin_capacity) = F[2] ;
+        particle_bin.val(_6, pidib % g_bin_capacity) = F[3] ;
+        particle_bin.val(_7, pidib % g_bin_capacity) = F[4] ;
+        particle_bin.val(_8, pidib % g_bin_capacity) = F[5] ;
+        particle_bin.val(_9, pidib % g_bin_capacity) = F[6] ;
+        particle_bin.val(_10, pidib % g_bin_capacity) = F[7];
+        particle_bin.val(_11, pidib % g_bin_capacity) = F[8];
+        particle_bin.val(_12, pidib % g_bin_capacity) = logJp;
+        particle_bin.val(_13, pidib % g_bin_capacity) = vel[0];
+        particle_bin.val(_14, pidib % g_bin_capacity) = vel[1];
+        particle_bin.val(_15, pidib % g_bin_capacity) = vel[2];
+        particle_bin.val(_16, pidib % g_bin_capacity) = sJBar_new;
+        //particle_bin.val(_17, pidib % g_bin_capacity) = masw_new; // water mass new
+        particle_bin.val(_18, pidib % g_bin_capacity) = pw_new; // water pore pressure new
+        particle_bin.val(_19, pidib % g_bin_capacity) = ID;
+      }
+
+      {
+      contrib = (C * pbuffer.mass - contrib * newDt) * Dp_inv;
+      }
+    }
+
+    local_base_index = (pos * g_dx_inv + 0.5f).cast<int>() - 1;
+    {
+      int direction_tag = dir_offset((base_index - 1) / g_blocksize -
+                              (local_base_index - 1) / g_blocksize);
+      if (g_buckets_on_particle_buffer)
+        next_pbuffer.add_advection(partition, local_base_index - 1, direction_tag, pidib);
+      else 
+        partition.add_advection(local_base_index - 1, direction_tag, pidib);
+    }
+
+#pragma unroll 3
+    for (char dd = 0; dd < 3; ++dd) {
+      local_pos[dd] = pos[dd] - local_base_index[dd] * g_dx;
+      PREC d =
+          (local_pos[dd] - ((int)(local_pos[dd] * g_dx_inv + 0.5) - 1) * g_dx) *
+          g_dx_inv;
+      dws(dd, 0) = 0.5 * (1.5 - d) * (1.5 - d);
+      d -= 1.0;
+      dws(dd, 1) = 0.75 - d * d;
+      d = 0.5 + d;
+      dws(dd, 2) = 0.5 * d * d;
+
+      local_base_index[dd] = (((base_index[dd] - 1) & g_blockmask) + 1) +
+                             local_base_index[dd] - base_index[dd];
+    }
+ 
+    scale = pbuffer.length * pbuffer.length; //< Area scale (m^2) 
+    PREC M_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
+      PREC pw;
+#pragma unroll 3
+    for (char i = 0; i < 3; i++)
+#pragma unroll 3
+      for (char j = 0; j < 3; j++)
+#pragma unroll 3
+        for (char k = 0; k < 3; k++) {
+          pos = pvec3{(PREC)i, (PREC)j, (PREC)k} * g_dx - local_pos;
+          PREC W = dws(0, i) * dws(1, j) * dws(2, k);
+          PREC wm = pbuffer.mass * W;
+          //PREC wmw = pbuffer.masw * W; // water mass
+          PREC wmw = (1) * pbuffer.masw * W; // Water mass should be changing relative to deformation? JB
+          PREC newDtKm = newDt * pbuffer.Kperm * pbuffer.masw;
+          atomicAdd(
+              &p2gbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wm); 
+
+          // Velocity*mass         
+          atomicAdd(
+              &p2gbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] +
+                             contrib[6] * pos[2]) * W);   
+          atomicAdd(
+              &p2gbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wm * vel[1] + (contrib[1] * pos[0] + contrib[4] * pos[1] +
+                             contrib[7] * pos[2]) * W);
+          atomicAdd(
+              &p2gbuffer[3][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wm * vel[2] + (contrib[2] * pos[0] + contrib[5] * pos[1] +
+                             contrib[8] * pos[2]) * W);
+
+          // ASFLIP unstressed velocity
+          atomicAdd(
+              &p2gbuffer[4][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wm * (vel[0] + Dp_inv * (C[0] * pos[0] + C[3] * pos[1] + C[6] * pos[2])));
+          atomicAdd(
+              &p2gbuffer[5][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wm * (vel[1] + Dp_inv * (C[1] * pos[0] + C[4] * pos[1] + C[7] * pos[2])));
+          atomicAdd(
+              &p2gbuffer[6][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wm * (vel[2] + Dp_inv * (C[2] * pos[0] + C[5] * pos[1] + C[8] * pos[2])));
+
+          // CoupledUP
+          atomicAdd(
+              &p2gbuffer[7][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wmw);
+          
+          atomicAdd(
+              &p2gbuffer[8][local_base_index[0] + i][local_base_index[1] + j]
+                        [local_base_index[2] + k],
+              wmw * pbuffer.Q_inv * pw_new 
+              - (newDtKm * (M_inv*W)*(M_inv*W) * (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]))*pw_new 
+              - newDt * pbuffer.alpha1 * M_inv * W * wmw * (pos[0] * vel[0] + pos[1] * vel[1] + pos[2] * vel[2]) );
+
+        }
+  }
+  __syncthreads();
+
+
+  /// arena no, channel no, cell no
+  for (int base = threadIdx.x; base < numMViInArena; base += blockDim.x) {
+    char local_block_id = base / numMViPerBlock;
+    auto blockno = partition.query(
+        ivec3{blockid[0] + ((local_block_id & 4) != 0 ? 1 : 0),
+              blockid[1] + ((local_block_id & 2) != 0 ? 1 : 0),
+              blockid[2] + ((local_block_id & 1) != 0 ? 1 : 0)});
+    int channelid = base % numMViPerBlock; //& (numMViPerBlock - 1);
+    char c = channelid % g_blockvolume;
+    char cz = channelid & g_blockmask;
+    char cy = (channelid >>= g_blockbits) & g_blockmask;
+    char cx = (channelid >>= g_blockbits) & g_blockmask;
+    channelid >>= g_blockbits;
+    PREC_G val =
+        p2gbuffer[channelid][cx + (local_block_id & 4 ? g_blocksize : 0)]
+                 [cy + (local_block_id & 2 ? g_blocksize : 0)]
+                 [cz + (local_block_id & 1 ? g_blocksize : 0)];
+    // MLS-MPM 
+    if (channelid == 0) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_0, c), val);
+    } else if (channelid == 1) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_1, c), val);
+    } else if (channelid == 2) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_2, c), val);
+    } else if (channelid == 3) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_3, c), val);
+    } 
+    
+    // ASFLIP
+    else if (channelid == 4) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_4, c), val);
+    } else if (channelid == 5) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_5, c), val);
+    } else if (channelid == 6) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_6, c), val);
+    } 
+    // CoupledUP
+    else if (channelid == 7) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_9, c), val);
+    } else if (channelid == 8) {
+      atomicAdd(&next_grid.ch(_0, blockno).val_1d(_10, c), val);
     }
   }
 }
@@ -11277,70 +10950,70 @@ __device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Nine> pattrib, I
 }
 
 
-template<typename I, typename T>
-__device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Ten> pattrib, I i, T parid, PREC val)
-{
-  if      (i == 0) pattrib.val(_0, parid) = val; 
-  else if (i == 1) pattrib.val(_1, parid) = val; 
-  else if (i == 2) pattrib.val(_2, parid) = val; 
-  else if (i == 3) pattrib.val(_3, parid) = val; 
-  else if (i == 4) pattrib.val(_4, parid) = val; 
-  else if (i == 5) pattrib.val(_5, parid) = val; 
-  else if (i == 6) pattrib.val(_6, parid) = val; 
-  else if (i == 7) pattrib.val(_7, parid) = val; 
-  else if (i == 8) pattrib.val(_8, parid) = val; 
-  else if (i == 9) pattrib.val(_9, parid) = val; 
-}
+// template<typename I, typename T>
+// __device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Ten> pattrib, I i, T parid, PREC val)
+// {
+//   if      (i == 0) pattrib.val(_0, parid) = val; 
+//   else if (i == 1) pattrib.val(_1, parid) = val; 
+//   else if (i == 2) pattrib.val(_2, parid) = val; 
+//   else if (i == 3) pattrib.val(_3, parid) = val; 
+//   else if (i == 4) pattrib.val(_4, parid) = val; 
+//   else if (i == 5) pattrib.val(_5, parid) = val; 
+//   else if (i == 6) pattrib.val(_6, parid) = val; 
+//   else if (i == 7) pattrib.val(_7, parid) = val; 
+//   else if (i == 8) pattrib.val(_8, parid) = val; 
+//   else if (i == 9) pattrib.val(_9, parid) = val; 
+// }
 
-template<typename I, typename T>
-__device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Eleven> pattrib, I i, T parid, PREC val)
-{
-  if      (i == 0) pattrib.val(_0, parid) = val; 
-  else if (i == 1) pattrib.val(_1, parid) = val; 
-  else if (i == 2) pattrib.val(_2, parid) = val; 
-  else if (i == 3) pattrib.val(_3, parid) = val; 
-  else if (i == 4) pattrib.val(_4, parid) = val; 
-  else if (i == 5) pattrib.val(_5, parid) = val; 
-  else if (i == 6) pattrib.val(_6, parid) = val; 
-  else if (i == 7) pattrib.val(_7, parid) = val; 
-  else if (i == 8) pattrib.val(_8, parid) = val; 
-  else if (i == 9) pattrib.val(_9, parid) = val; 
-  else if (i == 11) pattrib.val(_10, parid) = val; 
-}
+// template<typename I, typename T>
+// __device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Eleven> pattrib, I i, T parid, PREC val)
+// {
+//   if      (i == 0) pattrib.val(_0, parid) = val; 
+//   else if (i == 1) pattrib.val(_1, parid) = val; 
+//   else if (i == 2) pattrib.val(_2, parid) = val; 
+//   else if (i == 3) pattrib.val(_3, parid) = val; 
+//   else if (i == 4) pattrib.val(_4, parid) = val; 
+//   else if (i == 5) pattrib.val(_5, parid) = val; 
+//   else if (i == 6) pattrib.val(_6, parid) = val; 
+//   else if (i == 7) pattrib.val(_7, parid) = val; 
+//   else if (i == 8) pattrib.val(_8, parid) = val; 
+//   else if (i == 9) pattrib.val(_9, parid) = val; 
+//   else if (i == 11) pattrib.val(_10, parid) = val; 
+// }
 
-template<typename I, typename T>
-__device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Twelve> pattrib, I i, T parid, PREC val)
-{
-  if      (i == 0) pattrib.val(_0, parid) = val; 
-  else if (i == 1) pattrib.val(_1, parid) = val; 
-  else if (i == 2) pattrib.val(_2, parid) = val; 
-  else if (i == 3) pattrib.val(_3, parid) = val; 
-  else if (i == 4) pattrib.val(_4, parid) = val; 
-  else if (i == 5) pattrib.val(_5, parid) = val; 
-  else if (i == 6) pattrib.val(_6, parid) = val; 
-  else if (i == 7) pattrib.val(_7, parid) = val; 
-  else if (i == 8) pattrib.val(_8, parid) = val; 
-  else if (i == 9) pattrib.val(_9, parid) = val; 
-  else if (i == 10) pattrib.val(_10, parid) = val; 
-  else if (i == 11) pattrib.val(_11, parid) = val; 
-}
-template<typename I, typename T>
-__device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Thirteen> pattrib, I i, T parid, PREC val)
-{
-  if      (i == 0) pattrib.val(_0, parid) = val; 
-  else if (i == 1) pattrib.val(_1, parid) = val; 
-  else if (i == 2) pattrib.val(_2, parid) = val; 
-  else if (i == 3) pattrib.val(_3, parid) = val; 
-  else if (i == 4) pattrib.val(_4, parid) = val; 
-  else if (i == 5) pattrib.val(_5, parid) = val; 
-  else if (i == 6) pattrib.val(_6, parid) = val; 
-  else if (i == 7) pattrib.val(_7, parid) = val; 
-  else if (i == 8) pattrib.val(_8, parid) = val; 
-  else if (i == 9) pattrib.val(_9, parid) = val; 
-  else if (i == 10) pattrib.val(_10, parid) = val; 
-  else if (i == 11) pattrib.val(_11, parid) = val; 
-  else if (i == 12) pattrib.val(_12, parid) = val; 
-}
+// template<typename I, typename T>
+// __device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Twelve> pattrib, I i, T parid, PREC val)
+// {
+//   if      (i == 0) pattrib.val(_0, parid) = val; 
+//   else if (i == 1) pattrib.val(_1, parid) = val; 
+//   else if (i == 2) pattrib.val(_2, parid) = val; 
+//   else if (i == 3) pattrib.val(_3, parid) = val; 
+//   else if (i == 4) pattrib.val(_4, parid) = val; 
+//   else if (i == 5) pattrib.val(_5, parid) = val; 
+//   else if (i == 6) pattrib.val(_6, parid) = val; 
+//   else if (i == 7) pattrib.val(_7, parid) = val; 
+//   else if (i == 8) pattrib.val(_8, parid) = val; 
+//   else if (i == 9) pattrib.val(_9, parid) = val; 
+//   else if (i == 10) pattrib.val(_10, parid) = val; 
+//   else if (i == 11) pattrib.val(_11, parid) = val; 
+// }
+// template<typename I, typename T>
+// __device__ void setParticleAttrib(ParticleAttrib<num_attribs_e::Thirteen> pattrib, I i, T parid, PREC val)
+// {
+//   if      (i == 0) pattrib.val(_0, parid) = val; 
+//   else if (i == 1) pattrib.val(_1, parid) = val; 
+//   else if (i == 2) pattrib.val(_2, parid) = val; 
+//   else if (i == 3) pattrib.val(_3, parid) = val; 
+//   else if (i == 4) pattrib.val(_4, parid) = val; 
+//   else if (i == 5) pattrib.val(_5, parid) = val; 
+//   else if (i == 6) pattrib.val(_6, parid) = val; 
+//   else if (i == 7) pattrib.val(_7, parid) = val; 
+//   else if (i == 8) pattrib.val(_8, parid) = val; 
+//   else if (i == 9) pattrib.val(_9, parid) = val; 
+//   else if (i == 10) pattrib.val(_10, parid) = val; 
+//   else if (i == 11) pattrib.val(_11, parid) = val; 
+//   else if (i == 12) pattrib.val(_12, parid) = val; 
+// }
 // template<typename I, typename T>
 // __device__ void setParticleAttrib(ParticleAttrib<15> pattrib, I i, T parid, PREC val)
 // {
@@ -11483,71 +11156,71 @@ __device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Nine> pattrib, I
   else if (i == 8) val = pattrib.val(_8, parid) ; 
 }
 
-template<typename I, typename T>
-__device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Ten> pattrib, I i, T parid, PREC& val)
-{
-  if      (i == 0) val = pattrib.val(_0, parid) ; 
-  else if (i == 1) val = pattrib.val(_1, parid) ; 
-  else if (i == 2) val = pattrib.val(_2, parid) ; 
-  else if (i == 3) val = pattrib.val(_3, parid) ; 
-  else if (i == 4) val = pattrib.val(_4, parid) ; 
-  else if (i == 5) val = pattrib.val(_5, parid) ; 
-  else if (i == 6) val = pattrib.val(_6, parid) ; 
-  else if (i == 7) val = pattrib.val(_7, parid) ; 
-  else if (i == 8) val = pattrib.val(_8, parid) ; 
-  else if (i == 9) val = pattrib.val(_9, parid) ; 
-}
+// template<typename I, typename T>
+// __device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Ten> pattrib, I i, T parid, PREC& val)
+// {
+//   if      (i == 0) val = pattrib.val(_0, parid) ; 
+//   else if (i == 1) val = pattrib.val(_1, parid) ; 
+//   else if (i == 2) val = pattrib.val(_2, parid) ; 
+//   else if (i == 3) val = pattrib.val(_3, parid) ; 
+//   else if (i == 4) val = pattrib.val(_4, parid) ; 
+//   else if (i == 5) val = pattrib.val(_5, parid) ; 
+//   else if (i == 6) val = pattrib.val(_6, parid) ; 
+//   else if (i == 7) val = pattrib.val(_7, parid) ; 
+//   else if (i == 8) val = pattrib.val(_8, parid) ; 
+//   else if (i == 9) val = pattrib.val(_9, parid) ; 
+// }
 
-template<typename I, typename T>
-__device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Eleven> pattrib, I i, T parid, PREC& val)
-{
-  if      (i == 0) val = pattrib.val(_0, parid) ; 
-  else if (i == 1) val = pattrib.val(_1, parid) ; 
-  else if (i == 2) val = pattrib.val(_2, parid) ; 
-  else if (i == 3) val = pattrib.val(_3, parid) ; 
-  else if (i == 4) val = pattrib.val(_4, parid) ; 
-  else if (i == 5) val = pattrib.val(_5, parid) ; 
-  else if (i == 6) val = pattrib.val(_6, parid) ; 
-  else if (i == 7) val = pattrib.val(_7, parid) ; 
-  else if (i == 8) val = pattrib.val(_8, parid) ; 
-  else if (i == 9) val = pattrib.val(_9, parid) ; 
-  else if (i == 10) val = pattrib.val(_10, parid) ; 
-}
+// template<typename I, typename T>
+// __device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Eleven> pattrib, I i, T parid, PREC& val)
+// {
+//   if      (i == 0) val = pattrib.val(_0, parid) ; 
+//   else if (i == 1) val = pattrib.val(_1, parid) ; 
+//   else if (i == 2) val = pattrib.val(_2, parid) ; 
+//   else if (i == 3) val = pattrib.val(_3, parid) ; 
+//   else if (i == 4) val = pattrib.val(_4, parid) ; 
+//   else if (i == 5) val = pattrib.val(_5, parid) ; 
+//   else if (i == 6) val = pattrib.val(_6, parid) ; 
+//   else if (i == 7) val = pattrib.val(_7, parid) ; 
+//   else if (i == 8) val = pattrib.val(_8, parid) ; 
+//   else if (i == 9) val = pattrib.val(_9, parid) ; 
+//   else if (i == 10) val = pattrib.val(_10, parid) ; 
+// }
 
-template<typename I, typename T>
-__device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Twelve> pattrib, I i, T parid, PREC& val)
-{
-  if      (i == 0) val = pattrib.val(_0, parid) ; 
-  else if (i == 1) val = pattrib.val(_1, parid) ; 
-  else if (i == 2) val = pattrib.val(_2, parid) ; 
-  else if (i == 3) val = pattrib.val(_3, parid) ; 
-  else if (i == 4) val = pattrib.val(_4, parid) ; 
-  else if (i == 5) val = pattrib.val(_5, parid) ; 
-  else if (i == 6) val = pattrib.val(_6, parid) ; 
-  else if (i == 7) val = pattrib.val(_7, parid) ; 
-  else if (i == 8) val = pattrib.val(_8, parid) ; 
-  else if (i == 9) val = pattrib.val(_9, parid) ; 
-  else if (i == 10) val = pattrib.val(_10, parid) ; 
-  else if (i == 11) val = pattrib.val(_11, parid) ; 
-}
+// template<typename I, typename T>
+// __device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Twelve> pattrib, I i, T parid, PREC& val)
+// {
+//   if      (i == 0) val = pattrib.val(_0, parid) ; 
+//   else if (i == 1) val = pattrib.val(_1, parid) ; 
+//   else if (i == 2) val = pattrib.val(_2, parid) ; 
+//   else if (i == 3) val = pattrib.val(_3, parid) ; 
+//   else if (i == 4) val = pattrib.val(_4, parid) ; 
+//   else if (i == 5) val = pattrib.val(_5, parid) ; 
+//   else if (i == 6) val = pattrib.val(_6, parid) ; 
+//   else if (i == 7) val = pattrib.val(_7, parid) ; 
+//   else if (i == 8) val = pattrib.val(_8, parid) ; 
+//   else if (i == 9) val = pattrib.val(_9, parid) ; 
+//   else if (i == 10) val = pattrib.val(_10, parid) ; 
+//   else if (i == 11) val = pattrib.val(_11, parid) ; 
+// }
 
-template<typename I, typename T>
-__device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Thirteen> pattrib, I i, T parid, PREC& val)
-{
-  if      (i == 0) val = pattrib.val(_0, parid) ; 
-  else if (i == 1) val = pattrib.val(_1, parid) ; 
-  else if (i == 2) val = pattrib.val(_2, parid) ; 
-  else if (i == 3) val = pattrib.val(_3, parid) ; 
-  else if (i == 4) val = pattrib.val(_4, parid) ; 
-  else if (i == 5) val = pattrib.val(_5, parid) ;
-  else if (i == 6) val = pattrib.val(_6, parid) ; 
-  else if (i == 7) val = pattrib.val(_7, parid) ; 
-  else if (i == 8) val = pattrib.val(_8, parid) ; 
-  else if (i == 9) val = pattrib.val(_9, parid) ; 
-  else if (i == 10) val = pattrib.val(_10, parid) ; 
-  else if (i == 11) val = pattrib.val(_11, parid) ; 
-  else if (i == 12) val = pattrib.val(_12, parid) ; 
-}
+// template<typename I, typename T>
+// __device__ void getParticleAttrib(ParticleAttrib<num_attribs_e::Thirteen> pattrib, I i, T parid, PREC& val)
+// {
+//   if      (i == 0) val = pattrib.val(_0, parid) ; 
+//   else if (i == 1) val = pattrib.val(_1, parid) ; 
+//   else if (i == 2) val = pattrib.val(_2, parid) ; 
+//   else if (i == 3) val = pattrib.val(_3, parid) ; 
+//   else if (i == 4) val = pattrib.val(_4, parid) ; 
+//   else if (i == 5) val = pattrib.val(_5, parid) ;
+//   else if (i == 6) val = pattrib.val(_6, parid) ; 
+//   else if (i == 7) val = pattrib.val(_7, parid) ; 
+//   else if (i == 8) val = pattrib.val(_8, parid) ; 
+//   else if (i == 9) val = pattrib.val(_9, parid) ; 
+//   else if (i == 10) val = pattrib.val(_10, parid) ; 
+//   else if (i == 11) val = pattrib.val(_11, parid) ; 
+//   else if (i == 12) val = pattrib.val(_12, parid) ; 
+// }
 
 template <typename ParticleBuffer, typename T, typename I>
 __device__ void caseSwitch_ParticleAttrib(ParticleBuffer pbuffer, T _source_bin, T _source_pidib, I idx, PREC& val) { }

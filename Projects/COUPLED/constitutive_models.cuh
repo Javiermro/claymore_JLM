@@ -422,7 +422,6 @@ compute_stress_sand(T volume, T mu, T lambda, T cohesion, T beta,
 
 
 
-
 /// U-P, Drucker-Prager - Stress and Energy (JLM)
 /// Granular materials.
 template <typename T = double>
@@ -541,13 +540,12 @@ compute_stress_CoupledUP(T volume, T mu, T lambda, T cohesion, T beta,
   PF[1] = (P[1] * F[0] + P[4] * F[3] + P[7] * F[6] ) * volume;
   PF[2] = (P[2] * F[0] + P[5] * F[3] + P[8] * F[6] ) * volume;
   PF[3] = (P[0] * F[1] + P[3] * F[4] + P[6] * F[7]) * volume;
-  PF[4] = (P[1] * F[1] + P[4] * F[4] + P[7] * F[7]- pw) * volume;
+  PF[4] = (P[1] * F[1] + P[4] * F[4] + P[7] * F[7] - pw) * volume;
   PF[5] = (P[2] * F[1] + P[5] * F[4] + P[8] * F[7]) * volume;
   PF[6] = (P[0] * F[2] + P[3] * F[5] + P[6] * F[8]) * volume;
   PF[7] = (P[1] * F[2] + P[4] * F[5] + P[7] * F[8]) * volume;
-  PF[8] = (P[2] * F[2] + P[5] * F[5] + P[8] * F[8]- pw) * volume;
+  PF[8] = (P[2] * F[2] + P[5] * F[5] + P[8] * F[8] - pw) * volume;
 }
-
 
 /// * Non-Associative Cam-Clay - Stress and Energy
 /// * Elasto-plastic model. Good for snow, clay, concrete, etc.
