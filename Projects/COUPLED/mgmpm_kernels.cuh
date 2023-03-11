@@ -9747,12 +9747,14 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
           atomicAdd(
               &p2gbuffer[0][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
-              wm);
+              wm); 
 
+          // Velocity*mass         
           atomicAdd(
               &p2gbuffer[1][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],
-              wmw);
+              wm * vel[0] + (contrib[0] * pos[0] + contrib[3] * pos[1] +
+                             contrib[6] * pos[2]) * W);   
           atomicAdd(
               &p2gbuffer[2][local_base_index[0] + i][local_base_index[1] + j]
                         [local_base_index[2] + k],

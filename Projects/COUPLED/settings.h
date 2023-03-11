@@ -138,12 +138,12 @@ constexpr int g_grid_size_z = g_grid_size ; //< Domain z grid-blocks
 constexpr int g_num_grid_blocks_per_cuda_block = GBPCB;
 constexpr int g_num_warps_per_grid_block = 1;
 constexpr int g_num_warps_per_cuda_block = GBPCB;
-constexpr int g_max_active_block = 10000; //< Max active blocks in gridBlocks. Preallocated, can resize. Lower = less memory used.
+constexpr int g_max_active_block = 1000; //< Max active blocks in gridBlocks. Preallocated, can resize. Lower = less memory used.
 /// 62500 bytes for active mask
 
 // * Particles
 #define MAX_PPC 64 //< VERY important. Max particles-per-cell. Substantially effects memory/performance, exceeding MAX_PPC deletes particles. Generally, use MAX_PPC = 8*(Actual PPC) to account for compression.
-constexpr int g_max_particle_num = 1100000; //< Max no. particles. Preallocated, can resize.
+constexpr int g_max_particle_num = 100000; //< Max no. particles. Preallocated, can resize.
 constexpr int g_max_ppc = MAX_PPC; //< Default max_ppc
 constexpr int g_bin_capacity = 1 * 32; //< Particles per particle bin. Multiple of 32
 constexpr int g_particle_batch_capacity = 4 * g_bin_capacity; // Sets thread block size in g2p2g, etc. Usually 128, 256, or 512 is good. If kernel uses a lot of shared memory (e.g. 32kB+ when using FBAR and ASFLIP) then raise num. for occupancy benefits. If said kernel uses a lot of registers (e.g. 64+), then lower for occupancy. See CUDA occupancy calculator onlin
@@ -172,8 +172,8 @@ constexpr int g_max_grid_target_nodes = 16384; //< Max grid-nodes per gridTarget
 constexpr int g_grid_target_attribs = 10; //< No. of values per gridTarget node
 
 // * Particle-Targets
-constexpr int g_particle_target_cells = 4096; //< Max grid-nodes per gridTarget
-constexpr int g_max_particle_target_nodes = 4096; //< Max particless per particleTarget
+constexpr int g_particle_target_cells = 15000; //< Max grid-nodes per gridTarget
+constexpr int g_max_particle_target_nodes = 15000; //< Max particless per particleTarget
 constexpr int g_particle_target_attribs = 10; //< No. of values per gridTarget node
 constexpr int g_track_ID = 0; //< ID of particle to track, [0, g_max_fem_vertice_num)
 std::vector<int> g_track_IDs = {g_track_ID}; //< IDs of particles to track
