@@ -4,8 +4,8 @@
 		"fps": 10,
 		"frames": 10,
 		"default_dt": 1e-4,
-		"default_dx": 0.05,
-		"domain": [4.0, 2.0, 0.05],
+		"default_dx": 0.1,
+		"domain": [8.0, 4.0, 0.1],
 		"save_path": "./",
 		"save_suffix": ".bgeo"
 	},
@@ -25,8 +25,8 @@
 			"rho": 1650,
 			"youngs_modulus": 1e7,
 			"poisson_ratio": 0.3,
-			"friction_angle": 40,
-			"cohesion": 0.0005,
+			"friction_angle": 30,
+			"cohesion": 0.0,
 			"xi": 0.8, 
 			"hardeningOn": true,
 			"logJp0": 0,
@@ -44,7 +44,7 @@
 				{
 					"object": "Box",
 					"operation": "Add",
-					"span": [2.0, 2.0, 0.05],
+					"span": [4.0, 4.0, 0.1],
 					"offset": [0.0, 0.0, 0.0],
 					"array": [1, 1, 1],
 					"spacing": [0, 0, 0],
@@ -53,7 +53,7 @@
 				}
 			],
 			"partition_start": [0, 0, 0],
-			"partition_end": [4.0, 2.0, 0.025]
+			"partition_end": [8.0, 4.0, 0.05]
 		}
 	],
 	"grid-boundaries": [
