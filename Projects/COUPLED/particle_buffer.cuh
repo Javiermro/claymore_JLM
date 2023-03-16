@@ -152,7 +152,7 @@ using particle_bin20_f_ =
                f_, f_, f_,
                f_, f_,
                f_, f_,
-               f_>; ///< pos, F, vel, vol_Bar, J_Bar, mass_water, rho_water, ID
+               f_>; ///< pos, F, vol_Bar(logJp), vel,  J_Bar, mass_water, water_pore_pressure, ID
 
 template <material_e mt> struct particle_bin_;
 template <> struct particle_bin_<material_e::JFluid> : particle_bin4_f_ {};
@@ -1865,7 +1865,8 @@ struct ParticleBuffer<material_e::NACC> : ParticleBufferImpl<material_e::NACC> {
       : base_t{allocator, count} {}
 };
 
-
+ 
+ 
 template <>
 struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::CoupledUP> {
   using base_t = ParticleBufferImpl<material_e::CoupledUP>;
@@ -1893,12 +1894,13 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
       0.816496580927726f * 2.f * 0.5f / (3.f - 0.5f);
   bool volumeCorrection = true;
 
-  PREC rhow = 1.0e3; // water density
-  PREC alpha1 = 1.0; // Biot coef.
-  PREC poro = 0.2; // porosity
-  PREC Kf = 1.0e7; // Water compresibility
-  PREC Ks = 2.2e7; // Soil grain compresibility
-  PREC Kperm = 1.0e-5; // Isothropic permeabily
+  PREC rhow = 1000.f; // water density
+  PREC pw0 = 10.f; // initial water pore pressure
+  PREC alpha1 = 1.f; // Biot coef.
+  PREC poro = 0.2f; // porosity
+  PREC Kf = 10000000.f; // Water compresibility
+  PREC Ks = 22000000.f; // Soil grain compresibility
+  PREC Kperm = .00001f; // Isothropic permeabily
   PREC Q_inv = poro/Kf + (alpha1-poro)/Ks; // +poro/Kf + (alpha1-poro)/Ks = 9.45e-8;
   PREC masw = (poro * volume * rhow); // liquid phase mass
 
@@ -2005,12 +2007,14 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
    __device__ void
   getStress_Cauchy(T pw, vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
+    // compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
     compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
   template <typename T = PREC>
    __device__ void
   getStress_Cauchy(T vol, T pw, vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
+    // compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
     compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
   

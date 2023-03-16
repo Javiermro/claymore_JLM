@@ -80,7 +80,7 @@ namespace config /// * Simulation config setup and name-space
 // ! You will get errors if exceeding num. of:
 // ! (i) Physical GPUs, check 'nvidia-smi' in terminal, (ii) Max. compiled particle models per GPU
 constexpr int g_device_cnt = 1; //< IMPORTANT. Num. GPUs to compile for. Default 1.
-constexpr int g_models_per_gpu = 2; //< IMPORTANT. Max num. particle models per GPU. Default 1.
+constexpr int g_models_per_gpu = 1; //< IMPORTANT. Max num. particle models per GPU. Default 1.
 constexpr int g_model_cnt = g_device_cnt * g_models_per_gpu; //< Max num. particle models in sim.
 
 
@@ -91,7 +91,7 @@ constexpr int g_fps = 60; //< Default frames-per-second
 
 
 // Grid set-up
-#define DOMAIN_BITS 9 //< Domain resolution. 8 -> (2^8)^3 grid-nodes. Increase = finer grids.
+#define DOMAIN_BITS 10 //< Domain resolution. 8 -> (2^8)^3 grid-nodes. Increase = finer grids.
 #define BLOCK_BITS 2 //< Block resolution. 2 -> (2^2)^3 grid-nodes. Set for Quadratic B-Spline.
 #define ARENA_BITS 1 //< Arena resolution. 1 -> (2^1)^3 grid-blocks. Set for Quadratic B-Spline Shared Mem with Off-by-2.
 #define DXINV (1.f * (1 << DOMAIN_BITS)) // Max grid-nodes in a direction, inverse of grid-spacing.
@@ -146,7 +146,7 @@ constexpr int g_max_active_block = 1000; //< Max active blocks in gridBlocks. Pr
 
 // * Particles
 #define MAX_PPC 64 //< VERY important. Max particles-per-cell. Substantially effects memory/performance, exceeding MAX_PPC deletes particles. Generally, use MAX_PPC = 8*(Actual PPC) to account for compression.
-constexpr int g_max_particle_num = 1000000; //< Max no. particles. Preallocated, can resize.
+constexpr int g_max_particle_num = 100000; //< Max no. particles. Preallocated, can resize.
 constexpr int g_max_ppc = MAX_PPC; //< Default max_ppc
 constexpr int g_bin_capacity = 1 * 32; //< Particles per particle bin. Multiple of 32
 constexpr int g_particle_batch_capacity = 4 * g_bin_capacity; // Sets thread block size in g2p2g, etc. Usually 128, 256, or 512 is good. If kernel uses a lot of shared memory (e.g. 32kB+ when using FBAR and ASFLIP) then raise num. for occupancy benefits. If said kernel uses a lot of registers (e.g. 64+), then lower for occupancy. See CUDA occupancy calculator onlin

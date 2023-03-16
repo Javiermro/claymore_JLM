@@ -1,11 +1,11 @@
 {
 	"simulation": { 
-		"gravity": -9.81,
+		"gravity": [0.0, -9.81, 0.0],
 		"fps": 10,
 		"frames": 10,
 		"default_dt": 1e-4,
 		"default_dx": 0.1,
-		"domain": [8.0, 4.0, 0.1],
+		"domain": [2.0, 2.0, 0.1],
 		"save_path": "./",
 		"save_suffix": ".bgeo"
 	},
@@ -25,12 +25,12 @@
 			"rho": 1650,
 			"youngs_modulus": 1e7,
 			"poisson_ratio": 0.3,
-			"friction_angle": 30,
+			"friction_angle": 30, 
 			"cohesion": 0.0,
-			"xi": 0.8,
+			"xi": 0.8, 
 			"rhow": 1e3,
-			"alpha1": 0.0,
-			"poro": 0.0,
+			"alpha1": 1.0,
+			"poro": 0.8,
 			"Kf": 1e7,
 			"Ks": 2.2e7,
 			"Kperm": 1e-5,
@@ -44,13 +44,13 @@
 			"alpha": 0,
 			"beta_min": 0,
 			"beta_max": 0,
-			"FBAR_ratio": 0.99,
+			"FBAR_ratio": 0,
 			"velocity": [0, 0, 0],
 			"geometry": [
 				{
 					"object": "Box",
 					"operation": "Add",
-					"span": [1.0, 2.0, 0.05],
+					"span": [1.0, 2.0, 0.1],
 					"offset": [0.0, 0.0, 0.0],
 					"array": [1, 1, 1],
 					"spacing": [0, 0, 0],
@@ -59,7 +59,7 @@
 				}
 			],
 			"partition_start": [0, 0, 0],
-			"partition_end": [2.0, 2.0, 0.025]
+			"partition_end": [2.0, 2.0, 0.05]
 		}
 	],
 	"grid-boundaries": [
@@ -67,7 +67,7 @@
 			"object": "Wall",
 			"contact": "Separable",
 			"domain_start": [0.0, 0.0, 0.0],
-			"domain_end": [0.0, 0.0, 0.025],
+			"domain_end": [2.0, 2.0, 0.1],
 			"time": [0, 60]
 		}
 	],
@@ -77,8 +77,8 @@
 			"operation": "Sum",
 			"direction": "X+",
 			"output_frequency": 120,
-			"domain_start": [0, 0, 0],
-			"domain_end": [0.0, 0.0, 0.025]
+			"domain_start": [1.9, 0, 0],
+			"domain_end": [2.0, 2.0, 0.1]
 		}
 	],
 	"particle-targets": [
@@ -86,8 +86,8 @@
 			"attribute": "Elevation",
 			"operation": "Max",
 			"output_frequency": 120,
-			"domain_start": [0, 0, 0],
-			"domain_end": [0.0, 0.0, 0.025]
+			"domain_start": [1.9, 0, 0],
+			"domain_end": [2.0, 2.0, 0.1]
 		}
 	]
 }

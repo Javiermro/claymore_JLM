@@ -1651,7 +1651,7 @@ void parse_scene(std::string fn,
 
             // ! Hard-coded available attribute count per particle for input, output
             // ! Better optimized run-time binding for GPU Taichi-esque data-structures, but could definitely be improved using Thrust data-structures, etc. 
-
+ 
             // * Initialize particle attributes in simulator and on GPU
             if (!has_attributes) attributes = std::vector<std::vector<PREC> >(positions.size(), std::vector<PREC>(input_attribs.size(), 0.)); //< Zero initial attribs if none
             if (input_attribs.size() == 1){
@@ -1720,35 +1720,34 @@ void parse_scene(std::string fn,
             } else {
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(1);
               benchmark->initInitialAttribs<N>(gpu_id, model_id, attributes, has_attributes); 
-            }
-            
+            } 
             // * Initialize output particle attributes in simulator and on GPU
             attributes = std::vector<std::vector<PREC> >(positions.size(), std::vector<PREC>(output_attribs.size(), 0.));
-            if (output_attribs.size() == 1){
+            if (output_attribs.size() == 1){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(1);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 2){
+            } else if (output_attribs.size() == 2){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(2);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 3){
+            } else if (output_attribs.size() == 3){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(3);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 4){
+            } else if (output_attribs.size() == 4){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(4);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 5){
+            } else if (output_attribs.size() == 5){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(5);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 6){
+            } else if (output_attribs.size() == 6){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(6);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 7){
+            } else if (output_attribs.size() == 7){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(7);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 8){
+            } else if (output_attribs.size() == 8){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(8);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else if (output_attribs.size() == 9){
+            } else if (output_attribs.size() == 9){ 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(9);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
             } 
@@ -1784,15 +1783,15 @@ void parse_scene(std::string fn,
             //   constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(32);
             //   benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
             // } 
-            else if (output_attribs.size() > mn::config::g_max_particle_attribs){
+            else if (output_attribs.size() > mn::config::g_max_particle_attribs){ 
               fmt::print(fg(red), "ERROR: GPU[{}] MODEL[{}] More than [{}] output_attribs not valid. Requested: [{}]. Truncating...", gpu_id, model_id, mn::config::g_max_particle_attribs, output_attribs.size()); 
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(mn::config::g_max_particle_attribs);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            } else {
+            } else { 
               fmt::print(fg(orange), "WARNING: GPU[{}] MODEL[{}] output_attribs not found. Using [1] element default", gpu_id, model_id );
               constexpr mn::num_attribs_e N = static_cast<mn::num_attribs_e>(1);
               benchmark->initOutputAttribs<N>(gpu_id, model_id, attributes); 
-            }
+            } 
             fmt::print(fmt::emphasis::bold,
                       "-----------------------------------------------------------"
                       "-----\n");

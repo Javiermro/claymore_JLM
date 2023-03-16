@@ -295,7 +295,7 @@ struct mgsp_benchmark {
     pattribs[GPU_ID].emplace_back(ParticleAttrib<N>(device_allocator{}));
     cuDev.syncStream<streamIdx::Compute>();
     printDiv();
-
+    // fmt::print("-----01");
     std::vector<PREC> flattened;
     flattened.reserve(n * model_attribs.size());
     size_t reserve_size = 0;
@@ -304,10 +304,12 @@ struct mgsp_benchmark {
     flattened.reserve(reserve_size);
     for (int i=0; i<model_attribs.size(); ++i){
       const std::vector<PREC> & v = model_attribs[i]; 
+    // fmt::print("-----01 [{}]\n",i);
       flattened.insert( flattened.end() , v.begin() , v.end() );
     }
 
     match(pattribs[GPU_ID][MODEL_ID])([&](auto &pa) {
+    // fmt::print("-----03 ");
       checkCudaErrors(cudaMemcpyAsync((void *)&pa.val_1d(_0, 0), flattened.data(),
                       sizeof(PREC) * n * model_attribs.size(),
                       cudaMemcpyDefault, cuDev.stream_compute()));
@@ -690,6 +692,8 @@ struct mgsp_benchmark {
     lk.unlock();
     cv_slave.notify_all();
   }
+
+// ********************************main_loop**************************************
   void main_loop() {
     curFrame = 0;
     nextTime = 1.0 / fps; // Initial next time
@@ -1117,7 +1121,10 @@ struct mgsp_benchmark {
               else if (pb.use_ASFLIP && !pb.use_FEM && pb.use_FBAR) {
                 // g2p F-Bar ASFLIP - Non-Halo
                 timer.tick();
+
                 int shmem = (3 + 2) * (g_arenavolume * sizeof(PREC_G));
+// fmt::print("g2p_FBar PBCNT{} DID{} MID{} ROLLID{} SHMEM{} DT{} ",pbcnt[did],did,mid,rollid,shmem,dt);  
+
                 checkCudaErrors(cudaFuncSetAttribute(g2p_FBar<std::decay_t<decltype(particleBins[rollid][did][mid])>, std::decay_t<decltype(partitions[rollid ^ 1][did])>, std::decay_t<decltype(gridBlocks[0][did])>>, cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxShared));
                 cuDev.compute_launch(
                     {pbcnt[did], g_particle_batch, shmem}, 
@@ -1128,16 +1135,25 @@ struct mgsp_benchmark {
                     partitions[rollid ^ 1][did], partitions[rollid][did],
                     gridBlocks[0][did], gridBlocks[1][did]);
                 cuDev.syncStream<streamIdx::Compute>();
-                timer.tock(fmt::format("GPU[{}] frame {} step {} non_halo_g2p_FBar_ASFLIP", did,
-                                      curFrame, curStep));          
+// fmt::print("02*******..**");
+// timer.tock(fmt::format("GPU[{}] frame {} step {} non_halo_g2p_FBar_ASFLIP", did,curFrame, curStep));          
 
                 // p2g F-Bar - Non-Halo
-                timer.tick();
+                timer.tick(); 
+// fmt::print("00*******..**");
+
 #if DEBUG_COUPLED_UP
                 shmem = (10 + 9) * (g_arenavolume * sizeof(PREC_G));
 #else 
                 shmem = (8 + 7) * (g_arenavolume * sizeof(PREC_G));
 #endif
+
+// fmt::print("newDt %d ,  pb.mass %d\n", dt, pb.mass); // JLM
+// fmt::print("newDt %i ,  pb.mass %i\n", dt, pb.mass); // JLM
+// fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar(); 
+// if(mid==10) fmt::print("newDt %d , pb.Kperm %d pb.masw %d pb.Kperm %d\n", dt, pbuffer.Kperm, pbuffer.masw, pbuffer.Kperm); // JLM
+// if(mid==10) fmt::print("antes pb.Q_inv %d  M_inv %d  pb.alpha1 %d\n",  pb.Q_inv,  g_D_inv/( pb.length*pb.length),  pb.alpha1);
+ 
                 checkCudaErrors(cudaFuncSetAttribute(p2g_FBar<std::decay_t<decltype(particleBins[rollid][did][mid])>, std::decay_t<decltype(partitions[rollid ^ 1][did])>, std::decay_t<decltype(gridBlocks[0][did])>>, cudaFuncAttributePreferredSharedMemoryCarveout, cudaSharedmemCarveoutMaxShared));
                 cuDev.compute_launch(
                     {pbcnt[did], g_particle_batch, shmem}, 
@@ -1147,8 +1163,13 @@ struct mgsp_benchmark {
                         particleBins[rollid ^ 1][did][mid]),
                     partitions[rollid ^ 1][did], partitions[rollid][did],
                     gridBlocks[0][did], gridBlocks[1][did]);
+// fmt::print("01*******..**");
                 timer.tock(fmt::format("GPU[{}] frame {} step {} non_halo_p2g_FBar_ASFLIP", did,
                                       curFrame, curStep));
+
+// if(curFrame>2) 
+fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar(); 
+
               } //< End Non-Halo F-Bar + ASFLIP
 
               // Grid-to-Vertices - Update FEM - Vertices-to-Grid

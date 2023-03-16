@@ -455,6 +455,9 @@ compute_energy_CoupledUP(T volume, T mu, T lambda, T cohesion, T beta,
 
 template <typename T = double>
 __forceinline__ __device__ void
+// compute_stress_CoupledUP(T volume, T mu, T lambda, T cohesion, T beta,
+//                     T yieldSurface, bool volCorrection, T &logJp,
+//                     vec<T, 9> &F, vec<T, 9> &PF) {
 compute_stress_CoupledUP(T volume, T mu, T lambda, T cohesion, T beta,
                     T yieldSurface, bool volCorrection, T &logJp, T &pw, 
                     vec<T, 9> &F, vec<T, 9> &PF) {
@@ -533,17 +536,21 @@ compute_stress_CoupledUP(T volume, T mu, T lambda, T cohesion, T beta,
   for (int i = 0; i < 3; i++)
     P_hat[i] = (scaled_mu * New_S_log[i] + lambda * trace_log_S) / New_S[i];
 
+// printf("pw_const %d \n",pw);
   T P[9];
   matmul_mat_diag_matT_3D(P, U, P_hat, V);
   ///< |f| = P * F^T * Volume 
+  // PF[0] = (P[0] * F[0] + P[3] * F[3] + P[6] * F[6]) * volume;
   PF[0] = (P[0] * F[0] + P[3] * F[3] + P[6] * F[6] - pw) * volume;
   PF[1] = (P[1] * F[0] + P[4] * F[3] + P[7] * F[6] ) * volume;
   PF[2] = (P[2] * F[0] + P[5] * F[3] + P[8] * F[6] ) * volume;
   PF[3] = (P[0] * F[1] + P[3] * F[4] + P[6] * F[7]) * volume;
+  // PF[4] = (P[1] * F[1] + P[4] * F[4] + P[7] * F[7]) * volume;
   PF[4] = (P[1] * F[1] + P[4] * F[4] + P[7] * F[7] - pw) * volume;
   PF[5] = (P[2] * F[1] + P[5] * F[4] + P[8] * F[7]) * volume;
   PF[6] = (P[0] * F[2] + P[3] * F[5] + P[6] * F[8]) * volume;
   PF[7] = (P[1] * F[2] + P[4] * F[5] + P[7] * F[8]) * volume;
+  // PF[8] = (P[2] * F[2] + P[5] * F[5] + P[8] * F[8]) * volume;
   PF[8] = (P[2] * F[2] + P[5] * F[5] + P[8] * F[8] - pw) * volume;
 }
 
