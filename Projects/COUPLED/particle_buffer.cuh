@@ -56,7 +56,7 @@ enum class particle_output_attribs_e : int {
         StrainSmall_1,  StrainSmall_2, StrainSmall_3,
         VonMisesStrain,
         PorePressure,
-        logJp=100,
+        logJp,
         END,
         ExampleDeprecatedVariable //< Will give INVALID_CT output of -2
 };
@@ -149,8 +149,9 @@ using particle_bin20_f_ =
                          structural_padding_policy::sum_pow2_align>,
                ParticleBinDomain, attrib_layout::soa, f_, f_, f_, 
                f_, f_, f_, f_, f_, f_, f_, f_, f_, 
-               f_, f_, f_,
-               f_, f_,
+               f_, 
+               f_, f_, f_, 
+               f_,
                f_, f_,
                f_>; ///< pos, F, vol_Bar(logJp), vel,  J_Bar, mass_water, water_pore_pressure, ID
 
@@ -1895,14 +1896,14 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
   bool volumeCorrection = true;
 
   PREC rhow = 1000.f; // water density
-  PREC pw0 = 10.f; // initial water pore pressure
+  PREC init_pw = 0.f; // initial water pore pressure pw0
   PREC alpha1 = 1.f; // Biot coef.
   PREC poro = 0.2f; // porosity
-  PREC Kf = 10000000.f; // Water compresibility
-  PREC Ks = 22000000.f; // Soil grain compresibility
-  PREC Kperm = .00001f; // Isothropic permeabily
+  PREC Kf = 100000000.f; // Water compresibility  "Kf": 10e7,
+  PREC Ks = 10000000.f; // Soil grain compresibility  "Ks": 1e7,			
+  PREC Kperm = .01f; // Isothropic permeabily	"Kperm": 1e-2, [m/seg]
   PREC Q_inv = poro/Kf + (alpha1-poro)/Ks; // +poro/Kf + (alpha1-poro)/Ks = 9.45e-8;
-  PREC masw = (poro * volume * rhow); // liquid phase mass
+  PREC masw = mass * (poro/Kf + (alpha1-poro)/Ks); //(poro * volume * rhow); // liquid phase mass
 
   bool use_ASFLIP = false; //< Use ASFLIP/PIC mixing? Default off.
   PREC alpha = 0.0;  //< FLIP/PIC Mixing Factor [0.1] -> [PIC, FLIP]
@@ -1934,8 +1935,8 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
     Kf = mat.Kf;
     Ks = mat.Ks;
     Kperm = mat.Kperm;
-    Q_inv = poro/Kf + (alpha1-poro)/Ks;
-    masw = (poro * volume * rhow);
+    Q_inv = (poro/Kf + (alpha1-poro)/Ks);
+    masw = mass * (poro/Kf + (alpha1-poro)/Ks); //(poro * volume * rhow);
 
     beta_min = algo.ASFLIP_beta_min;
     beta_max = algo.ASFLIP_beta_max;
@@ -1962,11 +1963,12 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
           logJp,
           Velocity_X, Velocity_Y, Velocity_Z,
           JBar, DefGrad_Determinant_FBAR=JBar, 
+          J, // placeholder
           PorePressure,
           ID,
           END, // Values greater than or equal to END not held on particle
           // REQUIRED: Put N/A variables for specific material below END
-          J, DefGrad_Determinant=J, 
+          DefGrad_Determinant=J, 
           Volume_FBAR 
   };
 

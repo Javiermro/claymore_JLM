@@ -1403,6 +1403,7 @@ void parse_scene(std::string fn,
                 materialConfigs.logJp0 = CheckDouble(model, "logJp0", 0.0);
                 materialConfigs.frictionAngle = CheckDouble(model, "friction_angle", 30.0);
                 materialConfigs.cohesion = CheckDouble(model, "cohesion", 0.0);
+                materialConfigs.init_pw = CheckDouble(model, "Initial_water_pore_pressure", 0.0);
                 materialConfigs.beta = CheckDouble(model, "beta", 0.5);
                 materialConfigs.volumeCorrection = CheckBool(model, "SandVolCorrection", true); 
 

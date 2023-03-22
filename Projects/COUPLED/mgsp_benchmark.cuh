@@ -114,6 +114,7 @@ struct mgsp_benchmark {
 
     for (int MODEL_ID=0; MODEL_ID<getModelCnt(GPU_ID); MODEL_ID++){
       for (int d = 0; d<3; d++) vel0[GPU_ID][MODEL_ID][d] = 0.0; //< Init. vel.if no initial attributes
+      pw0[GPU_ID][MODEL_ID] = 0.0; //init_pw; // Initial water pore pressure //CoupleUP
     }
     printDiv();
     flag_pe = true; //< Flag for particle energy output
@@ -193,7 +194,7 @@ struct mgsp_benchmark {
   // Initialize particle models. Allow for varied materials on GPUs.
   template <material_e m>
   void initModel(int GPU_ID, int MODEL_ID, const std::vector<std::array<PREC, 3>> &model,
-                  const vec<PREC, 3> &v0) {
+                  const vec<PREC, 3> &v0) { //, const PREC &init_pw
     auto &cuDev = Cuda::ref_cuda_context(GPU_ID);
     cuDev.setContext();
     h_model_cnt[GPU_ID] += 1; // Increment model count on GPU
@@ -209,6 +210,8 @@ struct mgsp_benchmark {
       printDiv();
     }
     for (int i = 0; i < 3; ++i) vel0[GPU_ID][MODEL_ID][i] = v0[i]; // Initial velocity
+    pw0[GPU_ID][MODEL_ID] = 0.0; //init_pw; // Initial water pore pressure //CoupleUP
+
     cuDev.syncStream<streamIdx::Compute>();
 
     fmt::print("GPU[{}] MODEL[{}] Allocating ParticleArray.\n", GPU_ID, MODEL_ID);
@@ -725,6 +728,7 @@ struct mgsp_benchmark {
           //if (curStep == 0) dt = dt/2; //< Init. grid vel. update shifted 1/2 dt. Leap-frog time-integration instead of symplectic Euler for extra stability
           // Grid Update
           if (collisionObjs[did]) // If using SDF boundaries
+          // POR ACA NO DEBE PASAR
             cuDev.compute_launch(
                 {(nbcnt[did] + g_num_grid_blocks_per_cuda_block - 1) /
                      g_num_grid_blocks_per_cuda_block,
@@ -1167,8 +1171,7 @@ struct mgsp_benchmark {
                 timer.tock(fmt::format("GPU[{}] frame {} step {} non_halo_p2g_FBar_ASFLIP", did,
                                       curFrame, curStep));
 
-// if(curFrame>2) 
-fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar(); 
+// if(curFrame>=2) { fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar(); }
 
               } //< End Non-Halo F-Bar + ASFLIP
 
@@ -2216,9 +2219,15 @@ fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar();
                                   partitions[rollid][did], dt, vel0[did][mid], (PREC)grav[1]);
               fmt::print("GPU[{}] MODEl[{}] Rasterized init. attributes to grid.\n", did, mid);
             } else {
+#if DEBUG_COUPLED_UP
+              cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
+                              pb, particles[did][mid], gridBlocks[0][did],
+                              partitions[rollid][did], dt, vel0[did][mid], grav, pw0[did][mid]); 
+#else
               cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
                               pb, particles[did][mid], gridBlocks[0][did],
                               partitions[rollid][did], dt, vel0[did][mid], (PREC)grav[1]); 
+#endif    
             }
           });
           match(particleBins[rollid ^ 1][did][mid])([&](auto &pb) {
@@ -2235,9 +2244,16 @@ fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar();
                                   partitions[rollid][did], dt, vel0[did][mid], (PREC)grav[1]);
             fmt::print("GPU[{}] Rasterized init. attributes to grid.\n", did);
           } else {
+
+#if DEBUG_COUPLED_UP
+            cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
+                            pb, particles[did][mid], gridBlocks[0][did],
+                            partitions[rollid][did], dt, vel0[did][mid], grav, pw0[did][mid]); 
+#else
             cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
                             pb, particles[did][mid], gridBlocks[0][did],
                             partitions[rollid][did], dt, vel0[did][mid], (PREC)grav[1]); 
+#endif             
           }
         });
         cuDev.compute_launch({pbcnt[did], 128}, init_adv_bucket,
@@ -2474,6 +2490,7 @@ fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar();
   pvec3 grav;
   uint64_t curFrame, curStep, fps, nframes;
   pvec3 vel0[g_device_cnt][g_models_per_gpu]; ///< Sets initial velocities per gpu model, not individual particles
+  PREC pw0[g_device_cnt][g_models_per_gpu];
 
   // * Data-structures on GPUs or cast by kernels
   std::vector<Partition<1>> partitions[2]; ///< Organizes partition + halo info, halo_buffer.cuh
