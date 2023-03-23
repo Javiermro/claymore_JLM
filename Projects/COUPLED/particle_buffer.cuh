@@ -1898,11 +1898,11 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
   PREC rhow = 1000.f; // water density
   PREC init_pw = 0.f; // initial water pore pressure pw0
   PREC alpha1 = 1.f; // Biot coef.
-  PREC poro = 0.2f; // porosity
+  PREC poro = 0.3f; // porosity
   PREC Kf = 100000000.f; // Water compresibility  "Kf": 10e7,
   PREC Ks = 10000000.f; // Soil grain compresibility  "Ks": 1e7,			
   PREC Kperm = .01f; // Isothropic permeabily	"Kperm": 1e-2, [m/seg]
-  PREC Q_inv = poro/Kf + (alpha1-poro)/Ks; // +poro/Kf + (alpha1-poro)/Ks = 9.45e-8;
+  PREC Q_inv = poro/Kf + (alpha1-poro)/Ks; // +poro/Kf + (alpha1-poro)/Ks = 7,3e-8;
   PREC masw = mass * (poro/Kf + (alpha1-poro)/Ks); //(poro * volume * rhow); // liquid phase mass
 
   bool use_ASFLIP = false; //< Use ASFLIP/PIC mixing? Default off.
@@ -2007,17 +2007,21 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
 
   template <typename T = PREC>
    __device__ void
-  getStress_Cauchy(T pw, vec<T,9>& F, vec<T,9>& PF){
+  getStress_Cauchy(vec<T,9>& F, vec<T,9>& PF){
+  //  __device__ void
+  // getStress_Cauchy(T pw, vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
-    // compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
-    compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
+    compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
+    // compute_stress_CoupledUP(volume, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
   template <typename T = PREC>
    __device__ void
-  getStress_Cauchy(T vol, T pw, vec<T,9>& F, vec<T,9>& PF){
+  getStress_Cauchy(T vol, vec<T,9>& F, vec<T,9>& PF){
+  //  __device__ void
+  // getStress_Cauchy(T vol, T pw, vec<T,9>& F, vec<T,9>& PF){
     PREC lj = logJp0;
-    // compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
-    compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
+    compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, F, PF);
+    // compute_stress_CoupledUP(vol, mu, lambda, cohesion, beta, yieldSurface, volumeCorrection, lj, pw, F, PF);
   }
   
   template <typename T = PREC>

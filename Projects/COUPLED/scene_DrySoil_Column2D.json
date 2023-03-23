@@ -5,7 +5,7 @@
 		"frames": 10,
 		"default_dt": 1e-4,
 		"default_dx": 0.1,
-		"domain": [1.0, 1.0, 0.1],
+		"domain": [1.0, 1.1, 0.1],
 		"save_path": "./",
 		"save_suffix": ".bgeo"
 	},
@@ -16,9 +16,9 @@
 			"type": "particles", 
 			"color": "yellow",
 			"constitutive": "DruckerPrager",
-			"output_attribs": ["StressCauchy_Invariant1", "PorePressure", "Pressure"],
+			"output_attribs": ["StressCauchy_XX", "StressCauchy_YY", "StressCauchy_XY", "Pressure"],
 			"track_particle_id": [0],
-			"track_attribs": ["Velocity_X"],
+			"track_attribs": ["StressCauchy_YY"],
 			"target_attribs": ["Position_Y"],
 			"ppc": 8,
 			"CFL": 0.5,
@@ -60,7 +60,7 @@
 				}
 			],
 			"partition_start": [0, 0, 0],
-			"partition_end": [1.0, 1.0, 0.05]
+			"partition_end": [1.0, 1.1, 0.05]
 		}
 	],
 	"grid-boundaries": [
@@ -68,7 +68,7 @@
 			"object": "Wall",
 			"contact": "Separable",
 			"domain_start": [0.0, 0.0, 0.0],
-			"domain_end": [1.0, 1.0, 0.1],
+			"domain_end": [1.0, 1.1, 0.1],
 			"time": [0, 60]
 		}
 	],
@@ -78,8 +78,8 @@
 			"operation": "Sum",
 			"direction": "X+",
 			"output_frequency": 120,
-			"domain_start": [0.4, 0.0, 0.0],
-			"domain_end": [0.6, 1.0, 0.1]
+			"domain_start": [0.45, 0.0, 0.0],
+			"domain_end": [0.55, 1.0, 0.1]
 		}
 	],
 	"particle-targets": [
@@ -87,8 +87,8 @@
 			"attribute": "Elevation",
 			"operation": "Max",
 			"output_frequency": 120,
-			"domain_start": [0.4, 0.0, 0.0],
-			"domain_end": [0.6, 1.0, 0.1]
+			"domain_start": [0.45, 0.0, 0.0],
+			"domain_end": [0.55, 1.0, 0.1]
 		}
 	]
 }

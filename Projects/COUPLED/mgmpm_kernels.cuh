@@ -159,198 +159,24 @@ register_exterior_blocks(uint32_t blockCount, Partition partition) {
 #pragma unroll 3
       for (char k = -1; k < 2; ++k)
         partition.insert(ivec3{blockid[0] + i, blockid[1] + j, blockid[2] + k});
-}
-
-
-// template <typename ParticleArray, typename Grid, typename Partition>
-// __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::material_e::CoupledUP> pbuffer, const ParticleArray parray, Grid grid, const Partition partition, float dt, pvec3 vel0, PREC grav) {
-// }
-
-// template <typename ParticleBuffer, typename ParticleArray, typename Grid, typename Partition>
-// __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer, const ParticleArray parray, Grid grid, const Partition partition, float dt, pvec3 vel0, PREC grav, PREC pw0) {
- 
-// template <typename ParticleBuffer, typename Partition, typename Grid>
-// __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
-//                       const ParticleBuffer pbuffer,
-//                       ParticleBuffer next_pbuffer,
-//                       const Partition prev_partition, Partition partition,
-//                       const Grid grid, Grid next_grid) { }
-
-// template <typename Partition, typename Grid>
-// __global__ void g2p2g(float dt, float newDt, const ivec3 *__restrict__ blocks,
-//                       const ParticleBuffer<material_e::JFluid> pbuffer,
-//                       ParticleBuffer<material_e::JFluid> next_pbuffer,
-//                       const Partition prev_partition, Partition partition,
-//                       const Grid grid, Grid next_grid) {
-//   static constexpr uint64_t numViPerBlock = g_blockvolume * 3;}
-  
-
-template <typename ParticleBuffer, typename ParticleArray, typename Grid, typename Partition>
-__global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer, const ParticleArray parray, 
-                          Grid grid, const Partition partition, float dt, pvec3 vel0, pvec3 grav, PREC pw0) { }
- 
-template <typename ParticleArray, typename Grid, typename Partition>
-__global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::material_e::CoupledUP> pbuffer, 
-                          const ParticleArray parray, Grid grid, const Partition partition, 
-                          float dt, pvec3 vel0, pvec3 grav, PREC pw0) {
- uint32_t parid = blockIdx.x * blockDim.x + threadIdx.x;
-  if (parid >= particleCount) return;
-  PREC length = pbuffer.length;
-  PREC mass = pbuffer.mass;
-  PREC volume = pbuffer.volume;
-  pvec3 local_pos{(PREC)parray.val(_0, parid), (PREC)parray.val(_1, parid),
-                 (PREC)parray.val(_2, parid)}; 
-  pvec3 vel; 
-
-  pvec9 contrib, C;
-  vel.set(0.), contrib.set(0.), C.set(0.);
-  PREC J = 1.0;  // Volume ratio, Det def. gradient. 1 for t0 
-
-  bool hydrostatic_init = false;
-  if (hydrostatic_init) {
-    PREC pressure = (mass/volume) * (grav[2]) * (local_pos[1] - g_offset)*length; //< P = pgh
-    PREC voln = J * volume;
-    contrib[0] = - pressure * voln;
-    contrib[4] = - pressure * voln;
-    contrib[8] = - pressure * voln;
-  }
-  // // Leap-frog init vs symplectic Euler
-  // /if (1) dt = dt / 2.0;
-
-  vel[0] = vel0[0];
-  vel[1] = vel0[1];
-  vel[2] = vel0[2];
-  
-  // Dp^n = Dp^n+1 = (1/4) * dx^2 * I (Quad.)
-  PREC Dp_inv; //< Inverse Intertia-Like Tensor (1/m^2)
-  PREC scale = length * length; //< Area scale (m^2)
-  Dp_inv = g_D_inv / scale;     //< Scalar 4/(dx^2) for Quad. B-Spline
-  contrib = (C * mass - contrib * dt) * Dp_inv;
-  ivec3 global_base_index{int(std::lround(local_pos[0] * g_dx_inv) - 1),
-                          int(std::lround(local_pos[1] * g_dx_inv) - 1),
-                          int(std::lround(local_pos[2] * g_dx_inv) - 1)};
-  local_pos = local_pos - global_base_index * g_dx;
-  
-  //CoupledUP
-  // PREC Q_inv = 7.3e-8;// PREC Q_inv = pbuffer.Q_inv; 
-  PREC M_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
-  PREC newDtKm = dt * pbuffer.Kperm * mass;   
-  PREC alpha1 = pbuffer.alpha1; 
-  PREC rhow = pbuffer.rhow;   
-
-  vec<vec<PREC, 3>, 3> dws;
-  for (int d = 0; d < 3; ++d)
-    dws[d] = bspline_weight((PREC)local_pos[d]);
-  for (int i = 0; i < 3; ++i)
-    for (int j = 0; j < 3; ++j)
-      for (int k = 0; k < 3; ++k) {
-        ivec3 offset{i, j, k};
-        pvec3 xixp = offset * g_dx - local_pos;
-        PREC W = dws[0][i] * dws[1][j] * dws[2][k];
-        ivec3 local_index = global_base_index + offset;
-        PREC wm = mass * W;        
-        PREC wv = volume * W;
-        PREC J = 1.0; // Volume ratio, Det def. gradient. 1 for t0 
-        // PREC masw = mass * 7.3e-8; // Q_inv = 7.3e-8; 
-        PREC wmw = pbuffer.masw * W; //masw * W ; // PREC wmw = pbuffer.masw * W;   
-        PREC M_invW = M_inv * W;
-
-        int blockno = partition.query(ivec3{local_index[0] >> g_blockbits,
-                                            local_index[1] >> g_blockbits,
-                                            local_index[2] >> g_blockbits});
-        auto grid_block = grid.ch(_0, blockno);
-        for (int d = 0; d < 3; ++d)
-          local_index[d] &= g_blockmask;
-        atomicAdd(
-            &grid_block.val(_0, local_index[0], local_index[1], local_index[2]),
-            wm);
-        atomicAdd(
-            &grid_block.val(_1, local_index[0], local_index[1], local_index[2]),
-            wm * vel[0] + (contrib[0] * xixp[0] + contrib[3] * xixp[1] +
-                           contrib[6] * xixp[2]) *
-                              W);
-  
-        atomicAdd(
-            &grid_block.val(_2, local_index[0], local_index[1], local_index[2]),
-            wm * vel[1] + (contrib[1] * xixp[0] + contrib[4] * xixp[1] +
-                           contrib[7] * xixp[2]) *
-                              W);
-        atomicAdd(
-            &grid_block.val(_3, local_index[0], local_index[1], local_index[2]),
-            wm * vel[2] + (contrib[2] * xixp[0] + contrib[5] * xixp[1] +
-                           contrib[8] * xixp[2]) *
-                              W);
-        // ASFLIP velocity unstressed
-        atomicAdd(
-            &grid_block.val(_4, local_index[0], local_index[1], local_index[2]),
-            wm * (vel[0] + Dp_inv * (C[0] * xixp[0] + C[3] * xixp[1] +
-                           C[6] * xixp[2]) ) );
-        atomicAdd(
-            &grid_block.val(_5, local_index[0], local_index[1], local_index[2]),
-            wm * (vel[1] + Dp_inv * (C[1] * xixp[0] + C[4] * xixp[1] +
-                           C[7] * xixp[2]) ) );
-        atomicAdd(
-            &grid_block.val(_6, local_index[0], local_index[1], local_index[2]),
-            wm * (vel[2] + Dp_inv * (C[2] * xixp[0] + C[5] * xixp[1] +
-                           C[8] * xixp[2]) ) );
-        // Simple FBar: Vol, Vol JBar
-        atomicAdd(
-            &grid_block.val(_7, local_index[0], local_index[1], local_index[2]),
-            wv);
-        atomicAdd(
-            &grid_block.val(_8, local_index[0], local_index[1], local_index[2]),
-            wv * (1.0 - J));
-        // CoupledUP  
-        atomicAdd(
-            &grid_block.val(_9, local_index[0], local_index[1], local_index[2]),
-            wmw);  // JLM
-           
-          // atomicAdd(
-          //     &p2gbuffer[7][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k],
-          //     wmw);
-
-        atomicAdd(
-            &grid_block.val(_10, local_index[0], local_index[1], local_index[2]),
-               wmw * pw0); 
-
-        // atomicAdd(
-        //     &grid_block.val(_10, local_index[0], local_index[1], local_index[2]),
-        //        wmw * pw  
-        //       - (newDtKm * (M_invW)*(M_invW) * (xixp[0] * xixp[0] + xixp[1] * xixp[1] + xixp[2] * xixp[2]))*pw 
-        //       - dt * alpha1 * M_invW * wm * (xixp[0] * vel[0] + xixp[1] * vel[1] + xixp[2] * vel[2]) 
-        //       - newDtKm * M_invW * rhow * (xixp[0] * grav[0] + xixp[1] * grav[1] + xixp[2] * grav[2])); 
-              
-// printf(" rhow %f , alpha1 %f grav[0 %f 1 %f] \n",rhow, alpha1, grav[0], grav[1]); 
-// printf("pw %f pbuffer.masw %f pbuffer.Q_inv %f pbuffer.Q_invE9 %f Kperm %f \n", pw, pbuffer.masw, pbuffer.Q_inv, pbuffer.Q_inv*1000000000, pbuffer.Kperm); // JLM
-// if(pidib==10) 
-// printf(" newDtKm %f , M_inv %f alpha1 %f pw %f  \n",newDtKm, M_inv, alpha1, pw); // JLM
-// if(pidib==10) 
-// printf(" newDtKm * M_inv * wmw * xixp_i * G_i %f  \n",(newDtKm * M_inv * wmw * (xixp[0] * G[0] + xixp[1] * G[1] + xixp[2] * G[2]))*100000000); // JLM
- 
-          // atomicAdd(
-          //     &p2gbuffer[8][local_base_index[0] + i][local_base_index[1] + j]
-          //               [local_base_index[2] + k],
-          //      wmw * pbuffer.Q_inv * pw_new 
-          //     - (newDtKm * (M_inv*W)*(M_inv*W) * (pos[0] * pos[0] + pos[1] * pos[1] + pos[2] * pos[2]))*pw_new 
-          //     - newDt * pbuffer.alpha1 * M_inv * W * wmw * (pos[0] * vel[0] + pos[1] * vel[1] + pos[2] * vel[2]) 
-          //     - newDtKm * M_inv * W * pbuffer.masw * (pos[0] * grav[0] + pos[1] * grav[1] + pos[2] * grav[2])); 
-      }
-}
-
-
+} 
 
 // template <typename ParticleBuffer, typename ParticleArray, typename Grid, typename Partition>
 // __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer, const ParticleArray parray, 
-//                           Grid grid, const Partition partition, float dt, pvec3 vel0, PREC grav, PREC pw0) {
-//   uint32_t parid = blockIdx.x * blockDim.x + threadIdx.x;
+//                           Grid grid, const Partition partition, float dt, pvec3 vel0, pvec3 grav, PREC pw0) { }
+ 
+// template <typename ParticleArray, typename Grid, typename Partition>
+// __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::material_e::CoupledUP> pbuffer, 
+//                           const ParticleArray parray, Grid grid, const Partition partition, 
+//                           float dt, pvec3 vel0, pvec3 grav, PREC pw0) {
+//  uint32_t parid = blockIdx.x * blockDim.x + threadIdx.x;
 //   if (parid >= particleCount) return;
 //   PREC length = pbuffer.length;
 //   PREC mass = pbuffer.mass;
 //   PREC volume = pbuffer.volume;
 //   pvec3 local_pos{(PREC)parray.val(_0, parid), (PREC)parray.val(_1, parid),
 //                  (PREC)parray.val(_2, parid)}; 
-//   pvec3 vel;
-//   PREC pw = 0.0;  
+//   pvec3 vel; 
 
 //   pvec9 contrib, C;
 //   vel.set(0.), contrib.set(0.), C.set(0.);
@@ -358,7 +184,7 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::mater
 
 //   bool hydrostatic_init = false;
 //   if (hydrostatic_init) {
-//     PREC pressure = (mass/volume) * (grav) * (local_pos[1] - g_offset)*length; //< P = pgh
+//     PREC pressure = (mass/volume) * (grav[2]) * (local_pos[1] - g_offset)*length; //< P = pgh
 //     PREC voln = J * volume;
 //     contrib[0] = - pressure * voln;
 //     contrib[4] = - pressure * voln;
@@ -370,9 +196,7 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::mater
 //   vel[0] = vel0[0];
 //   vel[1] = vel0[1];
 //   vel[2] = vel0[2];
-
-//   pw = pw0;
-
+  
 //   // Dp^n = Dp^n+1 = (1/4) * dx^2 * I (Quad.)
 //   PREC Dp_inv; //< Inverse Intertia-Like Tensor (1/m^2)
 //   PREC scale = length * length; //< Area scale (m^2)
@@ -386,10 +210,9 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::mater
 //   //CoupledUP
 //   // PREC Q_inv = 7.3e-8;// PREC Q_inv = pbuffer.Q_inv; 
 //   PREC M_inv = g_D_inv / scale; //< Scalar 4/(dx^2) for Quad. B-Spline
-//   // PREC newDtKm = dt * 1.0e-2 * 0.3; //newDt * pbuffer.Kperm * pbuffer.masw; 
-//   PREC alpha1 = 1.0; // pbuffer.alpha1 ; // JLM HACERLO BIEN!!!
-//   float G[3] = {0.0, -9.81, 0.0};  //  JLM HACERLO BIEN!!!
-//   PREC rhow = 1e3; // pbuffer.rhow  JLM HACERLO BIEN!!!
+//   PREC newDtKm = dt * pbuffer.Kperm * mass;   
+//   PREC alpha1 = pbuffer.alpha1; 
+//   PREC rhow = pbuffer.rhow;   
 
 //   vec<vec<PREC, 3>, 3> dws;
 //   for (int d = 0; d < 3; ++d)
@@ -404,9 +227,8 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::mater
 //         PREC wm = mass * W;        
 //         PREC wv = volume * W;
 //         PREC J = 1.0; // Volume ratio, Det def. gradient. 1 for t0 
-//         PREC masw = mass * 7.3e-8; // Q_inv = 7.3e-8; // JLM HACERLO BIEN!!!
-//         PREC wmw = masw * W ; // PREC wmw = pbuffer.masw * W; // JLM HACERLO BIEN!!! 
-//         PREC newDtKm = dt * 1.0e-2 * mass;
+//         // PREC masw = mass * 7.3e-8; // Q_inv = 7.3e-8; 
+//         PREC wmw = pbuffer.masw * W; //masw * W ; // PREC wmw = pbuffer.masw * W;   
 //         PREC M_invW = M_inv * W;
 
 //         int blockno = partition.query(ivec3{local_index[0] >> g_blockbits,
@@ -465,10 +287,17 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::mater
 
 //         atomicAdd(
 //             &grid_block.val(_10, local_index[0], local_index[1], local_index[2]),
-//                wmw * pw  
-//               - (newDtKm * (M_invW)*(M_invW) * (xixp[0] * xixp[0] + xixp[1] * xixp[1] + xixp[2] * xixp[2]))*pw 
-//               - dt * alpha1 * M_invW * wm * (xixp[0] * vel[0] + xixp[1] * vel[1] + xixp[2] * vel[2]) 
-//               - newDtKm * M_invW * rhow * (xixp[0] * G[0] + xixp[1] * G[1] + xixp[2] * G[2])); 
+//                wmw * pw0); 
+
+//         // atomicAdd(
+//         //     &grid_block.val(_10, local_index[0], local_index[1], local_index[2]),
+//         //        wmw * pw  
+//         //       - (newDtKm * (M_invW)*(M_invW) * (xixp[0] * xixp[0] + xixp[1] * xixp[1] + xixp[2] * xixp[2]))*pw 
+//         //       - dt * alpha1 * M_invW * wm * (xixp[0] * vel[0] + xixp[1] * vel[1] + xixp[2] * vel[2]) 
+//         //       - newDtKm * M_invW * rhow * (xixp[0] * grav[0] + xixp[1] * grav[1] + xixp[2] * grav[2])); 
+              
+// // printf(" rhow %f , alpha1 %f grav[0 %f 1 %f] \n",rhow, alpha1, grav[0], grav[1]); 
+// // printf("pw %f pbuffer.masw %f pbuffer.Q_inv %f pbuffer.Q_invE9 %f Kperm %f \n", pw, pbuffer.masw, pbuffer.Q_inv, pbuffer.Q_inv*1000000000, pbuffer.Kperm); // JLM
 // // if(pidib==10) 
 // // printf(" newDtKm %f , M_inv %f alpha1 %f pw %f  \n",newDtKm, M_inv, alpha1, pw); // JLM
 // // if(pidib==10) 
@@ -483,6 +312,7 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer<mn::mater
 //           //     - newDtKm * M_inv * W * pbuffer.masw * (pos[0] * grav[0] + pos[1] * grav[1] + pos[2] * grav[2])); 
 //       }
 // }
+
 
 
 
@@ -515,6 +345,9 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer, 
   vel[0] = vel0[0];
   vel[1] = vel0[1];
   vel[2] = vel0[2];
+
+
+  PREC Q_inv = 7.3e-8; //poro/Kf + (alpha1-poro)/Ks; // +poro/Kf + (alpha1-poro)/Ks = 7,3e-8;
 
   // Dp^n = Dp^n+1 = (1/4) * dx^2 * I (Quad.)
   PREC Dp_inv; //< Inverse Intertia-Like Tensor (1/m^2)
@@ -584,6 +417,14 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer, 
         atomicAdd(
             &grid_block.val(_8, local_index[0], local_index[1], local_index[2]),
             wv * (1.0 - J)); 
+
+        // CoupledUP  
+        atomicAdd(
+            &grid_block.val(_9, local_index[0], local_index[1], local_index[2]),
+            wm * Q_inv);  // HACERLO BIEN JLM 
+        atomicAdd(
+            &grid_block.val(_10, local_index[0], local_index[1], local_index[2]),
+            wm * 0.0);    // HACERLO BIEN JLM
       }
 }
 
@@ -722,7 +563,7 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer,
         // atomicAdd(
         //     &grid_block.val(_9, local_index[0], local_index[1], local_index[2]),
         //     wmw); // JLM
-            // printf(" ERROR? IT SHOUN'T ENTER HERE 2 \n");
+            printf(" ERROR? IT SHOUN'T ENTER HERE 2 \n");
         // atomicAdd(
         //     &grid_block.val(_10, local_index[0], local_index[1], local_index[2]),
         //     wmw * 0.f); // JLM
@@ -1952,11 +1793,11 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
           pw = grid_block.val_1d(_10, cidib) * masw; //< m*p / m 
         }
 
-        if (masw > 0.f){
-            grid_block.val_1d(_10, cidib) = pw;
-          }else{
-            grid_block.val_1d(_10, cidib) = 0.f;
-          } 
+        // if (masw > 0.f){
+        //     grid_block.val_1d(_10, cidib) = pw;
+        //   }else{
+        //     grid_block.val_1d(_10, cidib) = 0.f;
+        //   } 
 
         // Tank Dimensions
         // Acts on individual grid-cell velocities
@@ -1991,12 +1832,13 @@ __global__ void update_grid_velocity_query_max(uint32_t blockCount, Grid grid,
         grid_block.val_1d(_2, cidib) = vel[1];
         grid_block.val_1d(_3, cidib) = vel[2]; 
 
+        grid_block.val_1d(_10, cidib) = (masw > 0.f) ? pw : 0.f;
         // if (masw > 0.f) grid_block.val_1d(_8, cidib) = pw; //  CoupledUP
-        if (masw > 0.f){ 
-          grid_block.val_1d(_10, cidib) = pw;
-        }else{ 
-          grid_block.val_1d(_10, cidib) = 0.f;
-        } 
+        // if (masw > 0.f){ 
+        //   grid_block.val_1d(_10, cidib) = pw;
+        // }else{ 
+        //   grid_block.val_1d(_10, cidib) = 0.f;
+        // } 
 
       }
       // unsigned activeMask = __ballot_sync(0xffffffff, mv[0] != 0.0f);
@@ -9914,8 +9756,8 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       val = grid_block.val_1d(_7, c); // Vol
     else if (channelid == 7) 
       val = grid_block.val_1d(_8, c); // J
-    // else if (channelid == 8)   
-    //   val = grid_block.val_1d(_9, c); // mass_w 
+    else if (channelid == 8)   
+      val = grid_block.val_1d(_9, c); // mass_w // JLM: CREO QUE ES INNECESARIO
     else if (channelid == 9) 
       val = grid_block.val_1d(_10, c); // pressure_w  
     g2pbuffer[channelid]
@@ -10026,7 +9868,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
           // PREC pw_i = g2pbuffer[9][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k] 
           //           / g2pbuffer[8][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k];
           
-          // PREC MW = g2pbuffer[8][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k] ;
+          PREC MW = g2pbuffer[8][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k] ; // JLM: CREO QUE ES INNECESARIO
 
           PREC pw_i = g2pbuffer[9][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k] ;
 
@@ -10057,7 +9899,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       pvec3 vel_p; //< Particle vel. at n
       PREC sJBar;
       PREC ID;
-      // PREC masw;
+      PREC masw; // JLM: CREO QUE ES INNECESARIO
       PREC pw; // CoupledUP water pressure old
 
       auto source_particle_bin = pbuffer.ch(_0, source_blockno);
@@ -10075,7 +9917,7 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       vel_p[1] = source_particle_bin.val(_14, source_pidib % g_bin_capacity); //< vy
       vel_p[2] = source_particle_bin.val(_15, source_pidib % g_bin_capacity); //< vz
       sJBar = source_particle_bin.val(_16, source_pidib % g_bin_capacity); //< JBar tn
-      // masw =  source_particle_bin.val(_17, source_pidib % g_bin_capacity); // water mass old JLM
+      masw =  source_particle_bin.val(_17, source_pidib % g_bin_capacity); // water mass old JLM // JLM: CREO QUE ES INNECESARIO
       pw =  source_particle_bin.val(_18, source_pidib % g_bin_capacity); // water pore pressure old
       ID =  source_particle_bin.val(_19, source_pidib % g_bin_capacity);
 
@@ -10097,15 +9939,21 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
       PREC J_Scale = cbrt((1.0 - sJBar_new) / J);
       // May need to redefine FBAR for Sand. DefGrad. F is altered
       // In compute_stress_sand before saving to particle buffer + FBAR scaling
-      PREC FBAR_ratio = pbuffer.FBAR_ratio;
-      PREC p_bar = pw_new*pbuffer.mass ; //pw_new/(pbuffer.volume*J);  // J = V/Vo
+      PREC FBAR_ratio = pbuffer.FBAR_ratio; 
+      PREC volume = pbuffer.volume;
+      PREC length = pbuffer.length;
+      // PREC pressure = (mass/volume) * (grav[2]) * (local_pos[1] - g_offset)*length; //< P = pgh
+      PREC voln = J * volume;
+      // contrib[0] =+ - pw_new * voln * length;
+      // contrib[4] =+ - pw_new * voln * length;
+      // contrib[8] =+ - pw_new * voln * length;
+      PREC p_bar = 0.0; //pw_new * voln * length; //pw_new*pbuffer.mass ; //pw_new/(pbuffer.volume*J);  // J = V/Vo
 #pragma unroll 9
       for (int d = 0; d < 9; d++) F[d] = F[d] * ((1.0 - FBAR_ratio) * 1.0 + (FBAR_ratio) * J_Scale);
-      // compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda, pbuffer.cohesion,
-      // pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, F, contrib);
       compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda, pbuffer.cohesion,
-      pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, p_bar, F, contrib);
-
+      pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, F, contrib);
+      // compute_stress_CoupledUP(pbuffer.volume, pbuffer.mu, pbuffer.lambda, pbuffer.cohesion,
+      // pbuffer.beta, pbuffer.yieldSurface, pbuffer.volumeCorrection, logJp, p_bar, F, contrib);
       {
         auto particle_bin = g_buckets_on_particle_buffer 
             ? next_pbuffer.ch(_0, next_pbuffer._binsts[src_blockno] + pidib / g_bin_capacity) 
@@ -12471,7 +12319,8 @@ __global__ void retrieve_selected_grid_cells(
           PREC_G mvz1 = sourceblock.val(_3, i, j, k) * l;
           PREC_G volume = sourceblock.val(_7, i, j, k) ;
           PREC_G JBar = sourceblock.val(_8, i, j, k) ;
-          PREC_G pw = sourceblock.val(_10, i, j, k) ; //CoupledUP
+          PREC_G masw = sourceblock.val(_9, i, j, k) ; //CoupledUP // JLM: CREO QUE ES INNECESARIO
+          PREC_G pw = sourceblock.val(_10, i, j, k) ; //CoupledUP  
 
           /// Set values in grid-array to specific cell from grid-buffer
           //PREC_G m1  = mass;

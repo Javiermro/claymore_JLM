@@ -2219,15 +2219,15 @@ struct mgsp_benchmark {
                                   partitions[rollid][did], dt, vel0[did][mid], (PREC)grav[1]);
               fmt::print("GPU[{}] MODEl[{}] Rasterized init. attributes to grid.\n", did, mid);
             } else {
-#if DEBUG_COUPLED_UP
-              cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
-                              pb, particles[did][mid], gridBlocks[0][did],
-                              partitions[rollid][did], dt, vel0[did][mid], grav, pw0[did][mid]); 
-#else
+// #if DEBUG_COUPLED_UP
+//               cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
+//                               pb, particles[did][mid], gridBlocks[0][did],
+//                               partitions[rollid][did], dt, vel0[did][mid], grav, pw0[did][mid]); 
+// #else
               cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
                               pb, particles[did][mid], gridBlocks[0][did],
                               partitions[rollid][did], dt, vel0[did][mid], (PREC)grav[1]); 
-#endif    
+// #endif    
             }
           });
           match(particleBins[rollid ^ 1][did][mid])([&](auto &pb) {
@@ -2245,15 +2245,15 @@ struct mgsp_benchmark {
             fmt::print("GPU[{}] Rasterized init. attributes to grid.\n", did);
           } else {
 
-#if DEBUG_COUPLED_UP
-            cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
-                            pb, particles[did][mid], gridBlocks[0][did],
-                            partitions[rollid][did], dt, vel0[did][mid], grav, pw0[did][mid]); 
-#else
+// #if DEBUG_COUPLED_UP
+//             cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
+//                             pb, particles[did][mid], gridBlocks[0][did],
+//                             partitions[rollid][did], dt, vel0[did][mid], grav, pw0[did][mid]); 
+// #else
             cuDev.compute_launch({(pcnt[did][mid] + 255) / 256, 256}, rasterize, pcnt[did][mid],
                             pb, particles[did][mid], gridBlocks[0][did],
                             partitions[rollid][did], dt, vel0[did][mid], (PREC)grav[1]); 
-#endif             
+// #endif             
           }
         });
         cuDev.compute_launch({pbcnt[did], 128}, init_adv_bucket,

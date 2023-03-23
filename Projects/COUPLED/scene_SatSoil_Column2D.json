@@ -1,0 +1,94 @@
+{
+	"simulation": { 
+		"gravity": [0.0, -9.81, 0.0],
+		"fps": 10,
+		"frames": 10,
+		"default_dt": 1e-4,
+		"default_dx": 0.1,
+		"domain": [1.0, 1.1, 0.1],
+		"save_path": "./",
+		"save_suffix": ".bgeo"
+	},
+	"models": [
+		{
+			"model": 0,
+			"gpu": 0,
+			"type": "particles", 
+			"color": "yellow",
+			"constitutive": "CoupledUP",
+			"output_attribs": ["StressCauchy_XX", "StressCauchy_YY", "StressCauchy_XY", "PorePressure", "Pressure"],
+			"track_particle_id": [0],
+			"track_attribs": ["PorePressure"],
+			"target_attribs": ["Position_Y"],
+			"ppc": 8,
+			"CFL": 0.5,
+			"rho": 1700,
+			"youngs_modulus": 3e7,
+			"poisson_ratio": 0.2,
+			"friction_angle": 30, 
+			"cohesion": 0.0,
+			"xi": 0.8, 
+			"rhow": 1e3,
+			"alpha1": 1.0,
+			"poro": 0.3,
+			"Kf": 10e7,
+			"Ks": 1e7,
+			"Kperm": 1e-2,
+			"Initial_water_pore_pressure": 0.0,
+			"hardeningOn": true,
+			"logJp0": 0,
+			"beta": 1,
+			"SandVolCorrection": true,
+			"use_ASFLIP": true,
+			"use_FEM": false,
+			"use_FBAR": true,
+			"alpha": 0,
+			"beta_min": 0,
+			"beta_max": 0,
+			"FBAR_ratio": 0,
+			"velocity": [0, 0, 0],
+			"geometry": [
+				{
+					"object": "Box",
+					"operation": "Add",
+					"span": [1.0, 1.0, 0.1],
+					"offset": [0.0, 0.0, 0.0],
+					"array": [1, 1, 1],
+					"spacing": [0, 0, 0],
+					"rotate": [0, 0, 0],
+					"fulcrum": [0, 0, 0]
+				}
+			],
+			"partition_start": [0, 0, 0],
+			"partition_end": [1.0, 1.1, 0.05]
+		}
+	],
+	"grid-boundaries": [
+		{
+			"object": "Wall",
+			"contact": "Separable",
+			"domain_start": [0.0, 0.0, 0.0],
+			"domain_end": [1.0, 1.1, 0.1],
+			"time": [0, 60]
+		}
+	],
+	"grid-targets": [
+		{
+			"attribute": "Force",
+			"operation": "Sum",
+			"direction": "X+",
+			"output_frequency": 120,
+			"domain_start": [0.45, 0.0, 0.0],
+			"domain_end": [0.55, 1.0, 0.1]
+		}
+	],
+	"particle-targets": [
+		{
+			"attribute": "Elevation",
+			"operation": "Max",
+			"output_frequency": 120,
+			"domain_start": [0.45, 0.0, 0.0],
+			"domain_end": [0.55, 1.0, 0.1]
+		}
+	]
+}
