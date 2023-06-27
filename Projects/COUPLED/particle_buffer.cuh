@@ -1900,7 +1900,7 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
   PREC alpha1 = 1.f; // Biot coef.
   PREC poro = 0.3f; // porosity
   PREC Kf = 100000000.f; // Water compresibility  "Kf": 10e7,
-  PREC Ks = 10000000.f; // Soil grain compresibility  "Ks": 1e7,			
+  PREC Ks = E/(3*(1-2*nu)); // Soil grain compresibility  "Ks": 1.666e7,	Ks = mat.E / (3.0 * (1 - 2 * mat.nu)); 		
   PREC Kperm = .01f; // Isothropic permeabily	"Kperm": 1e-2, [m/seg]
   PREC Q_inv = poro/Kf + (alpha1-poro)/Ks; // +poro/Kf + (alpha1-poro)/Ks = 7,3e-8;
   PREC masw = mass * (poro/Kf + (alpha1-poro)/Ks); //(poro * volume * rhow); // liquid phase mass
@@ -1933,10 +1933,15 @@ struct ParticleBuffer<material_e::CoupledUP> : ParticleBufferImpl<material_e::Co
     alpha1 = mat.alpha1;
     poro = mat.poro;
     Kf = mat.Kf;
-    Ks = mat.Ks;
-    Kperm = mat.Kperm;
+    Ks = mat.E / (3.0 * (1 - 2 * mat.nu));  //E / (3(1-2ν)) ; //mat.Ks;
+    Kperm = mat.Kperm; // [m/s]
+    // Kperm should be expressed in m^2/(Pa.s)
+    // 1 Darcy = 0.831 m/day = (1E-6)^2 m^2 --> 1m/s = 1.04E-7 m^2
+    // Dynamic water viscosity at 20C 0.001 Pa.s
+    Kperm = Kperm * 1.04E-7 / 0.001; 
+
     Q_inv = (poro/Kf + (alpha1-poro)/Ks);
-    masw = mass * (poro/Kf + (alpha1-poro)/Ks); //(poro * volume * rhow);
+    masw = mass ; // * (poro/Kf + (alpha1-poro)/Ks); //(poro * volume * rhow);
 
     beta_min = algo.ASFLIP_beta_min;
     beta_max = algo.ASFLIP_beta_max;

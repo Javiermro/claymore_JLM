@@ -1,11 +1,11 @@
 {
 	"simulation": { 
 		"gravity": [0.0, -9.81, 0.0],
-		"fps": 10,
-		"frames": 10,
+		"fps": 100000,
+		"frames": 100,
 		"default_dt": 1e-4,
-		"default_dx": 0.05,
-		"domain": [1.0, 1.1, 0.05],
+		"default_dx": 0.0041666,
+		"domain": [1.0, 0.002, 0.002],
 		"save_path": "./",
 		"save_suffix": ".bgeo"
 	},
@@ -18,7 +18,7 @@
 			"constitutive": "CoupledUP",
 			"output_attribs": ["StressCauchy_XX", "StressCauchy_YY", "StressCauchy_XY", "Pressure", "PorePressure"],
 			"track_particle_id": [0],
-			"track_attribs": ["StressCauchy_YY"],
+			"track_attribs": ["PorePressure"],
 			"target_attribs": ["Position_Y"],
 			"ppc": 8,
 			"CFL": 0.5,
@@ -29,11 +29,11 @@
 			"cohesion": 0.0,
 			"xi": 0.8, 
 			"rhow": 1e3,
-			"alpha1": 0.0,
+			"alpha1": 1.0,
 			"poro": 0.3,
 			"Kf": 10e7,
-			"Ks": 1e7,
-			"Kperm": 1e-2,
+			"Ks": 16666666.7,
+			"Kperm": 0.01,
 			"Initial_water_pore_pressure": 0.0,
 			"hardeningOn": true,
 			"logJp0": 0,
@@ -45,13 +45,13 @@
 			"use_FBAR": true,
 			"beta_min": 0,
 			"beta_max": 0,
-			"FBAR_ratio": 0.99,
+			"FBAR_ratio": 0.0,
 			"velocity": [0, 0, 0],
 			"geometry": [
 				{
 					"object": "Box",
 					"operation": "Add",
-					"span": [1.0, 1.0, 0.05],
+					"span": [1.0, 0.002, 0.002],
 					"offset": [0.0, 0.0, 0.0],
 					"array": [1, 1, 1],
 					"spacing": [0, 0, 0],
@@ -60,7 +60,7 @@
 				}
 			],
 			"partition_start": [0, 0, 0],
-			"partition_end": [1.0, 1.1, 0.025]
+			"partition_end": [1.0, 0.002, 0.002]
 		}
 	],
 	"grid-boundaries": [
@@ -68,7 +68,7 @@
 			"object": "Wall",
 			"contact": "Separable",
 			"domain_start": [0.0, 0.0, 0.0],
-			"domain_end": [1.0, 1.1, 0.05],
+			"domain_end": [1.0, 0.002, 0.002],
 			"time": [0, 60]
 		}
 	],
@@ -79,7 +79,7 @@
 			"direction": "X+",
 			"output_frequency": 120,
 			"domain_start": [0.0, 0.0, 0.0],
-			"domain_end": [0.0, 0.0, 0.0]
+			"domain_end": [0.001, 0.001, 0.002]
 		}
 	],
 	"particle-targets": [

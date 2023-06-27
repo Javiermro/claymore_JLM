@@ -1119,8 +1119,7 @@ void parse_scene(std::string fn,
           fmt::print(fg(yellow),"Partitions _indexTable data-structure: Saved [{}] percent memory of preallocated partition _indexTable by reudcing domainBlockCnt from [{}] to run-time of [{}] using domain input relative to DOMAIN_BITS and default_dx.\n", reduction, mn::config::g_grid_size_x * mn::config::g_grid_size_y * mn::config::g_grid_size_z, domainBlockCnt);
           fmt::print(fg(cyan),
               "Scene simulation parameters: Domain Length [{}], domainBlockCnt [{}], default_dx[{}], default_dt[{}], fps[{}], frames[{}], gravity[{}, {}, {}], save_suffix[{}]\n",
-              l, domainBlockCnt, sim_default_dx, sim_default_dt,
-              sim_fps, sim_frames, sim_gravity[0], sim_gravity[1], sim_gravity[2], save_suffix);
+              l, domainBlockCnt, sim_default_dx, sim_default_dt,sim_fps, sim_frames, sim_gravity[0], sim_gravity[1], sim_gravity[2], save_suffix);
           benchmark = std::make_unique<mn::mgsp_benchmark>(
               l, domainBlockCnt, sim_default_dt,
               sim_fps, sim_frames, sim_gravity, save_suffix);

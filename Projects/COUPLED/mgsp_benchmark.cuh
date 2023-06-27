@@ -698,6 +698,8 @@ struct mgsp_benchmark {
 
 // ********************************main_loop**************************************
   void main_loop() {
+ printf("***** DOMAIN_BITS %f , DXINV %f , g_dx_inv_d %f , g_D_inv %f , g_dx %f ---\n",
+                  DOMAIN_BITS, DXINV, g_dx_inv_d, g_D_inv, g_dx);
     curFrame = 0;
     nextTime = 1.0 / fps; // Initial next time
     //dt = compute_dt(0.f, curTime, nextTime, dtDefault);
@@ -726,17 +728,22 @@ struct mgsp_benchmark {
           checkCudaErrors(cudaMemsetAsync(d_gravity_energy_grid, 0, sizeof(PREC_G),
                                           cuDev.stream_compute()));
           //if (curStep == 0) dt = dt/2; //< Init. grid vel. update shifted 1/2 dt. Leap-frog time-integration instead of symplectic Euler for extra stability
-          // Grid Update
-          if (collisionObjs[did]) // If using SDF boundaries
+          // Grid Update 
+
+ printf("***** DOMAIN_BITS %f , DXINV %f , g_dx_inv_d %f , g_D_inv %f , g_dx %f ---\n",
+                  DOMAIN_BITS, DXINV, g_dx_inv_d, g_D_inv, g_dx);
+fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar(); 
+
+          if (collisionObjs[did]) {// If using SDF boundaries
           // POR ACA NO DEBE PASAR
-            cuDev.compute_launch(
-                {(nbcnt[did] + g_num_grid_blocks_per_cuda_block - 1) /
-                     g_num_grid_blocks_per_cuda_block,
-                 g_num_warps_per_cuda_block * 32, g_num_warps_per_cuda_block * sizeof(PREC_G)},
-                update_grid_velocity_query_max, (uint32_t)nbcnt[did],
-                gridBlocks[0][did], partitions[rollid][did], dt,
-                (const SignedDistanceGrid)(*collisionObjs[did]), d_maxVel, curTime, grav[1]);
-          else { // If using basic geometry boundaries
+            // cuDev.compute_launch(
+            //     {(nbcnt[did] + g_num_grid_blocks_per_cuda_block - 1) /
+            //          g_num_grid_blocks_per_cuda_block,
+            //      g_num_warps_per_cuda_block * 32, g_num_warps_per_cuda_block * sizeof(PREC_G)},
+            //     update_grid_velocity_query_max, (uint32_t)nbcnt[did],
+            //     gridBlocks[0][did], partitions[rollid][did], dt,
+            //     (const SignedDistanceGrid)(*collisionObjs[did]), d_maxVel, curTime, grav[1]);
+          } else { // If using basic geometry boundaries
             cuDev.compute_launch(
                 {(nbcnt[did] + g_num_grid_blocks_per_cuda_block - 1) /
                      g_num_grid_blocks_per_cuda_block,
@@ -910,7 +917,8 @@ struct mgsp_benchmark {
               
                 // p2g_FBar Halo
                 timer.tick();
-#if DEBUG_COUPLED_UP
+#if DEBUG_eo
+dfdsD_UP
                   shmem = (10 + 9) * (g_arenavolume * sizeof(PREC_G));
 #else
                   shmem = (8 + 7) * (g_arenavolume * sizeof(PREC_G));
