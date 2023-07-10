@@ -27,7 +27,10 @@ set(CUDA_FOUND ${CMAKE_CUDA_COMPILER})
 
 # --------- Dell G7 Laptop - GTX 1060 Max-Q GPU - Univ. of Wash. - Justin Bonus
 #set(TARGET_CUDA_ARCH -gencode=arch=compute_61,code=sm_61)
-set(TARGET_CUDA_ARCH -arch=sm_61)
+#set(TARGET_CUDA_ARCH -arch=sm_61)
+
+# --------- Dell G15 Laptop - GTX 3050 ti - JLM
+set(TARGET_CUDA_ARCH -gencode=arch=compute_86,code=sm_86)
 
 # --------- Set NVCC compiler flags ---------
 # NOTE: I removed compiler flags such as --use_fast_math to improve engineering accuracy

@@ -730,9 +730,9 @@ struct mgsp_benchmark {
           //if (curStep == 0) dt = dt/2; //< Init. grid vel. update shifted 1/2 dt. Leap-frog time-integration instead of symplectic Euler for extra stability
           // Grid Update 
 
- printf("***** DOMAIN_BITS %f , DXINV %f , g_dx_inv_d %f , g_D_inv %f , g_dx %f ---\n",
-                  DOMAIN_BITS, DXINV, g_dx_inv_d, g_D_inv, g_dx);
-fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar(); 
+// printf("***** DOMAIN_BITS %f , DXINV %f , g_dx_inv_d %f , g_D_inv %f , g_dx %f ---\n",
+//                  DOMAIN_BITS, DXINV, g_dx_inv_d, g_D_inv, g_dx);
+// fmt::print(fg(fmt::color::red),"Press ENTER JLM \n"); getchar(); 
 
           if (collisionObjs[did]) {// If using SDF boundaries
           // POR ACA NO DEBE PASAR

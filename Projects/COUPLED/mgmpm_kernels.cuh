@@ -563,7 +563,7 @@ __global__ void rasterize(uint32_t particleCount, const ParticleBuffer pbuffer,
         // atomicAdd(
         //     &grid_block.val(_9, local_index[0], local_index[1], local_index[2]),
         //     wmw); // JLM
-            printf(" ERROR? IT SHOUN'T ENTER HERE 2 \n");
+            printf(" ERROR? IT SHOUN'T ENTER HERE 2 (JLM)\n");
         // atomicAdd(
         //     &grid_block.val(_10, local_index[0], local_index[1], local_index[2]),
         //     wmw * 0.f); // JLM
@@ -10238,8 +10238,8 @@ __global__ void p2g_FBar(float dt, float newDt, const ivec3 *__restrict__ blocks
                 - Q_newDt_m * pbuffer.alpha1 * M_inv * W * W * (pos[0] * vel[0] + pos[1] * vel[1] + pos[2] * vel[2])  
                 + Q_newDt_m * Kperm * M_inv * W * pbuffer.rhow * (pos[0] * grav[0] + pos[1] * grav[1] + pos[2] * grav[2]) / pbuffer.length  // * pbuffer.rho / (-grav[1])
                 );  
-if(pidib==0) printf(" pbuffer.Q_inv %f pw_bar %f pw_new*W %f  M_inv %f Kperm %f g_D_inv %f pbuffer.length %f scale %f\n",
-                  pbuffer.Q_inv*1000000,pw_bar,pw_new*W,M_inv,Kperm,g_D_inv,pbuffer.length,scale);  
+//if(pidib==0) printf(" pbuffer.Q_inv %f pw_bar %f pw_new*W %f  M_inv %f Kperm %f g_D_inv %f pbuffer.length %f scale %f\n",
+//                  pbuffer.Q_inv*1000000,pw_bar,pw_new*W,M_inv,Kperm,g_D_inv,pbuffer.length,scale);  
             // atomicAdd(
             //     &p2gbuffer[8][local_base_index[0] + i][local_base_index[1] + j][local_base_index[2] + k],
             //     wm * pw_new 
